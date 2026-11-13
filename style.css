@@ -1154,4 +1154,98 @@
             align-items: center; justify-content: center; cursor: pointer;
         }
         @media (max-width: 768px) { .mobile-menu-btn { display: flex; } }
- 
+ /* ===== GOOGLE AUTH & CLOUD SYNC STYLES ===== */
+.google-nav-btn {
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 14px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.86rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+.google-nav-btn:hover {
+    border-color: var(--primary-light);
+    background: rgba(14, 165, 233, 0.12);
+    transform: translateY(-2px);
+}
+.google-nav-btn.connected {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+}
+.google-nav-btn img {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.btn-google {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.btn-google:hover {
+    background: #f8fafc;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
+}
+.btn-google i {
+    color: #ea4335;
+}
+
+.google-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-highlight);
+    border-radius: 18px;
+    margin-bottom: 12px;
+}
+.google-profile-card img {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    object-fit: cover;
+    border: 2px solid var(--primary-light);
+}
+.google-profile-info h4 {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 2px;
+}
+.google-profile-info p {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    direction: ltr;
+    text-align: right;
+}
+.sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 50px;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+@media (max-width: 768px) {
+    .google-nav-btn span { display: none; }
+    .google-nav-btn { padding: 0 12px; }
+}

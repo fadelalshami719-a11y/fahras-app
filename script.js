@@ -1,3 +1,14 @@
+// ===== إعدادات مصادقة Google و Drive =====
+        const GOOGLE_CLIENT_ID = '674857553188-s9tu07obk7eods4ffh8ds8aekuavjfiq.apps.googleusercontent.com';
+        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+        const DRIVE_BACKUP_FILENAME = 'fahras_backup.json';
+
+        let tokenClient = null;
+        let googleAccessToken = localStorage.getItem('fahras_google_token') || null;
+        let googleTokenExpiry = Number(localStorage.getItem('fahras_google_expiry') || 0);
+        let googleUserProfile = JSON.parse(localStorage.getItem('fahras_google_user') || 'null');
+        let autoSyncTimeout = null;
+
         function generateUniqueId() {
             return Date.now() + '_' + Math.random().toString(36).substr(2, 10);
         }
@@ -30,6 +41,322 @@
         let currentSort = 'recent';
         let currentCategoryDetailId = null;
 
+        // ===== تهيئة عميل مصادقة جوجل =====
+        function initGoogleAuth() {
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                setTimeout(initGoogleAuth, 500);
+                return;
+            }
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: GOOGLE_SCOPES,
+                callback: async (tokenResponse) => {
+                    if (tokenResponse.error) {
+                        showToast('تعذر إتمام تسجيل الدخول عبر Google', 'error');
+                        return;
+                    }
+                    googleAccessToken = tokenResponse.access_token;
+                    googleTokenExpiry = Date.now() + ((tokenResponse.expires_in || 3500) * 1000);
+                    localStorage.setItem('fahras_google_token', googleAccessToken);
+                    localStorage.setItem('fahras_google_expiry', String(googleTokenExpiry));
+
+                    await fetchGoogleUserProfile();
+                    updateGoogleUI();
+                    showToast('تم تسجيل الدخول بنجاح! جارٍ مزامنة بياناتك...', 'success');
+                    await syncOnLogin();
+                }
+            });
+        }
+
+        function isGoogleTokenValid() {
+            return googleAccessToken && Date.now() < (googleTokenExpiry - 60000);
+        }
+
+        async function ensureValidGoogleToken(interactive = true) {
+            if (isGoogleTokenValid()) return true;
+            if (!tokenClient) initGoogleAuth();
+            if (!tokenClient) return false;
+
+            return new Promise((resolve) => {
+                const originalCallback = tokenClient.callback;
+                tokenClient.callback = async (resp) => {
+                    tokenClient.callback = originalCallback;
+                    if (resp.error || !resp.access_token) {
+                        resolve(false);
+                        return;
+                    }
+                    googleAccessToken = resp.access_token;
+                    googleTokenExpiry = Date.now() + ((resp.expires_in || 3500) * 1000);
+                    localStorage.setItem('fahras_google_token', googleAccessToken);
+                    localStorage.setItem('fahras_google_expiry', String(googleTokenExpiry));
+                    if (!googleUserProfile) await fetchGoogleUserProfile();
+                    updateGoogleUI();
+                    resolve(true);
+                };
+                tokenClient.requestAccessToken({ prompt: interactive ? '' : 'none' });
+            });
+        }
+
+        function signInWithGoogle() {
+            if (!tokenClient) {
+                initGoogleAuth();
+                if (!tokenClient) {
+                    showToast('مكتبة Google قيد التحميل، حاول بعد لحظة...', 'info');
+                    return;
+                }
+            }
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+
+        function handleNavbarGoogleClick() {
+            if (googleUserProfile) {
+                showView('settings', document.getElementById('settingsTrigger'));
+            } else {
+                signInWithGoogle();
+            }
+        }
+
+        async function fetchGoogleUserProfile() {
+            if (!googleAccessToken) return;
+            try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${googleAccessToken}` }
+                });
+                if (res.ok) {
+                    const info = await res.json();
+                    googleUserProfile = {
+                        name: info.name || 'مستخدم فِهرِس',
+                        email: info.email || '',
+                        picture: info.picture || ''
+                    };
+                    localStorage.setItem('fahras_google_user', JSON.stringify(googleUserProfile));
+                }
+            } catch (err) {
+                console.error('Error fetching profile:', err);
+            }
+        }
+
+        function updateGoogleUI() {
+            const loggedOutBox = document.getElementById('googleLoggedOutBox');
+            const loggedInBox = document.getElementById('googleLoggedInBox');
+            const navBtn = document.getElementById('navGoogleBtn');
+            const sidebarAvatar = document.getElementById('sidebarAvatar');
+            const sidebarName = document.getElementById('sidebarUserName');
+            const sidebarStatus = document.getElementById('sidebarSyncStatus');
+
+            if (googleUserProfile) {
+                if (loggedOutBox) loggedOutBox.style.display = 'none';
+                if (loggedInBox) loggedInBox.style.display = 'block';
+
+                const avatarEl = document.getElementById('googleUserAvatar');
+                const nameEl = document.getElementById('googleUserName');
+                const emailEl = document.getElementById('googleUserEmail');
+                if (avatarEl && googleUserProfile.picture) avatarEl.src = googleUserProfile.picture;
+                if (nameEl) nameEl.textContent = googleUserProfile.name;
+                if (emailEl) emailEl.textContent = googleUserProfile.email;
+
+                if (navBtn) {
+                    navBtn.classList.add('connected');
+                    navBtn.innerHTML = googleUserProfile.picture
+                        ? `<img src="${googleUserProfile.picture}" alt=""><span>متصل</span>`
+                        : `<i class="fab fa-google"></i><span>متصل</span>`;
+                }
+                if (sidebarName) sidebarName.textContent = googleUserProfile.name;
+                if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cloud-check" style="color:var(--success);"></i> مزامنة مفعّلة`;
+                if (sidebarAvatar && googleUserProfile.picture) {
+                    sidebarAvatar.innerHTML = `<img src="${googleUserProfile.picture}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
+                }
+            } else {
+                if (loggedOutBox) loggedOutBox.style.display = 'block';
+                if (loggedInBox) loggedInBox.style.display = 'none';
+                if (navBtn) {
+                    navBtn.classList.remove('connected');
+                    navBtn.innerHTML = `<i class="fab fa-google"></i><span id="navGoogleText">دخول</span>`;
+                }
+                if (sidebarName) sidebarName.textContent = 'فاضل الشامي';
+                if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cog"></i> الإعدادات والنسخ`;
+                if (sidebarAvatar) sidebarAvatar.textContent = 'ف';
+            }
+        }
+
+        // ===== دوال التعامل مع Google Drive (appDataFolder) =====
+        async function findDriveBackupFile() {
+            const valid = await ensureValidGoogleToken(false);
+            if (!valid) return null;
+
+            const query = encodeURIComponent(`name='${DRIVE_BACKUP_FILENAME}' and 'appDataFolder' in parents and trashed=false`);
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name,modifiedTime)`, {
+                headers: { Authorization: `Bearer ${googleAccessToken}` }
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return (data.files && data.files.length > 0) ? data.files[0] : null;
+        }
+
+        async function uploadBackupToDrive(silent = false) {
+            if (!googleUserProfile) return false;
+            const valid = await ensureValidGoogleToken(!silent);
+            if (!valid) return false;
+
+            try {
+                const existingFile = await findDriveBackupFile();
+                const backupPayload = JSON.stringify({
+                    links,
+                    categories,
+                    updatedAt: new Date().toISOString(),
+                    app: 'فهرس - فاضل الشامي'
+                });
+
+                const metadata = {
+                    name: DRIVE_BACKUP_FILENAME,
+                    mimeType: 'application/json'
+                };
+                if (!existingFile) {
+                    metadata.parents = ['appDataFolder'];
+                }
+
+                const boundary = '-------fahras_boundary_2026';
+                const multipartBody =
+                    `--${boundary}\r\n` +
+                    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+                    `${JSON.stringify(metadata)}\r\n` +
+                    `--${boundary}\r\n` +
+                    `Content-Type: application/json\r\n\r\n` +
+                    `${backupPayload}\r\n` +
+                    `--${boundary}--`;
+
+                const url = existingFile
+                    ? `https://www.googleapis.com/upload/drive/v3/files/${existingFile.id}?uploadType=multipart`
+                    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+                const method = existingFile ? 'PATCH' : 'POST';
+
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        Authorization: `Bearer ${googleAccessToken}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`
+                    },
+                    body: multipartBody
+                });
+
+                if (res.ok) {
+                    const syncLabel = document.getElementById('lastSyncLabel');
+                    if (syncLabel) {
+                        const timeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+                        syncLabel.innerHTML = `<i class="fas fa-check-circle"></i> آخر مزامنة: ${timeStr}`;
+                    }
+                    if (!silent) showToast('تم حفظ النسخة الاحتياطية على Google Drive!', 'success');
+                    return true;
+                }
+            } catch (err) {
+                console.error('Drive upload error:', err);
+                if (!silent) showToast('حدث خطأ أثناء الرفع إلى Google Drive', 'error');
+            }
+            return false;
+        }
+
+        async function syncOnLogin() {
+            const file = await findDriveBackupFile();
+            if (file) {
+                await downloadAndMergeDriveBackup(file.id, true);
+            } else {
+                await uploadBackupToDrive(true);
+            }
+        }
+
+        async function manualSyncToDrive() {
+            const valid = await ensureValidGoogleToken(true);
+            if (!valid) {
+                showToast('يرجى إعادة تسجيل الدخول لتجديد الجلسة', 'info');
+                return;
+            }
+            await uploadBackupToDrive(false);
+        }
+
+        async function restoreFromDrive() {
+            const valid = await ensureValidGoogleToken(true);
+            if (!valid) return;
+
+            const file = await findDriveBackupFile();
+            if (!file) {
+                showToast('لا توجد نسخة احتياطية محفوظة على Google Drive حتى الآن', 'info');
+                return;
+            }
+            await downloadAndMergeDriveBackup(file.id, false);
+        }
+
+        async function downloadAndMergeDriveBackup(fileId, isAutoLogin = false) {
+            try {
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: { Authorization: `Bearer ${googleAccessToken}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (isAutoLogin && links.length === 0 && Array.isArray(data.links)) {
+                    links = data.links;
+                    if (Array.isArray(data.categories) && data.categories.length > 0) {
+                        categories = data.categories;
+                    }
+                    saveData(true);
+                    updateCategorySelect();
+                    renderAll();
+                    showToast(`تمت استعادة ${links.length} رابط من Google Drive!`, 'success');
+                } else {
+                    mergeImportedObject(data);
+                }
+            } catch (err) {
+                console.error('Restore error:', err);
+                showToast('تعذر قراءة النسخة الاحتياطية من Drive', 'error');
+            }
+        }
+
+        function signOutGoogle() {
+            showConfirmModal('هل تريد تسجيل الخروج من حساب Google؟ ستبقى نسختك الاحتياطية محفوظة بأمان على Drive.', () => {
+                googleAccessToken = null;
+                googleTokenExpiry = 0;
+                googleUserProfile = null;
+                localStorage.removeItem('fahras_google_token');
+                localStorage.removeItem('fahras_google_expiry');
+                localStorage.removeItem('fahras_google_user');
+                updateGoogleUI();
+                showToast('تم تسجيل الخروج بنجاح', 'info');
+            }, 'confirm');
+        }
+
+        function deleteGoogleAccountAndData() {
+            showConfirmModal('تحذير: سيتم حذف ملف النسخة الاحتياطية نهائياً من Google Drive وإلغاء ربط حسابك بالتطبيق. هل أنت متأكد؟', async () => {
+                try {
+                    const valid = await ensureValidGoogleToken(true);
+                    if (valid) {
+                        const file = await findDriveBackupFile();
+                        if (file) {
+                            await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+                                method: 'DELETE',
+                                headers: { Authorization: `Bearer ${googleAccessToken}` }
+                            });
+                        }
+                        if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                            google.accounts.oauth2.revoke(googleAccessToken, () => {});
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error deleting Drive file:', err);
+                }
+
+                googleAccessToken = null;
+                googleTokenExpiry = 0;
+                googleUserProfile = null;
+                localStorage.removeItem('fahras_google_token');
+                localStorage.removeItem('fahras_google_expiry');
+                localStorage.removeItem('fahras_google_user');
+                updateGoogleUI();
+                showToast('تم حذف النسخة السحابية وإلغاء ربط الحساب بنجاح', 'error');
+            }, 'clear');
+        }
+
+        // ===== بقية منطق التطبيق الأساسي =====
         function initTheme() {
             const saved = localStorage.getItem('linkvault_theme') || 'dark';
             document.body.setAttribute('data-theme', saved);
@@ -58,14 +385,19 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
+            initGoogleAuth();
+            updateGoogleUI();
             updateCategorySelect();
             renderAll();
+
+            if (googleUserProfile && isGoogleTokenValid()) {
+                syncOnLogin();
+            }
 
             document.getElementById('searchInput').addEventListener('input', function() {
                 performSearch(this.value);
             });
 
-            // تبديل أيقونة الشعار بسهم التوسيع عند تمرير الفأرة في وضع الطي
             const logoBox = document.querySelector('.logo-icon');
             const logoIcon = document.getElementById('logoMainIcon');
             const sidebar = document.getElementById('sidebar');
@@ -479,7 +811,7 @@
         }
 
         function clearAllData() {
-            showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات بشكل نهائي. هل أنت متأكد؟', () => {
+            showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات المحلية بشكل نهائي. هل أنت متأكد؟', () => {
                 links = [];
                 currentFilter = 'all';
                 categories = [
@@ -492,7 +824,7 @@
                 saveData();
                 renderAll();
                 updateCategorySelect();
-                showToast('تم حذف جميع البيانات', 'error');
+                showToast('تم حذف جميع البيانات المحلية', 'error');
             }, 'clear');
         }
 
@@ -582,6 +914,71 @@
             showToast('تم تصدير نسخة فِهرِس بنجاح!', 'success');
         }
 
+        function mergeImportedObject(data) {
+            let addedLinks = 0, addedCategories = 0, skippedLinks = 0, skippedCategories = 0;
+
+            if (data.categories && Array.isArray(data.categories)) {
+                data.categories.forEach(importedCat => {
+                    const exists = categories.some(c => c.name.trim().toLowerCase() === importedCat.name.trim().toLowerCase());
+                    if (!exists) {
+                        categories.push({ ...importedCat, id: 'cat_' + generateUniqueId() });
+                        addedCategories++;
+                    } else {
+                        skippedCategories++;
+                    }
+                });
+            }
+
+            if (data.links && Array.isArray(data.links)) {
+                data.links.forEach(importedLink => {
+                    const normalizedUrl = (importedLink.url || '').replace(/\/+$/, '').toLowerCase();
+                    const exists = links.some(l => (l.url || '').replace(/\/+$/, '').toLowerCase() === normalizedUrl);
+                    if (!exists) {
+                        let catId = importedLink.category || '';
+                        if (catId && !categories.some(c => c.id === catId)) {
+                            const oldCat = data.categories?.find(c => c.id === catId);
+                            if (oldCat) {
+                                const matchedCat = categories.find(c => c.name.trim().toLowerCase() === oldCat.name.trim().toLowerCase());
+                                catId = matchedCat ? matchedCat.id : '';
+                            } else {
+                                catId = '';
+                            }
+                        }
+                        links.push({
+                            id: generateUniqueId(),
+                            name: importedLink.name || 'بدون عنوان',
+                            url: importedLink.url,
+                            category: catId,
+                            favorite: importedLink.favorite === true,
+                            description: importedLink.description || '',
+                            favicon: getFavicon(importedLink.url),
+                            domain: getDomain(importedLink.url),
+                            date: importedLink.date || new Date().toLocaleDateString('ar-SA'),
+                            timestamp: importedLink.timestamp || Date.now(),
+                            hour: importedLink.hour !== undefined ? importedLink.hour : new Date().getHours(),
+                            clicks: typeof importedLink.clicks === 'number' ? importedLink.clicks : 0
+                        });
+                        addedLinks++;
+                    } else {
+                        skippedLinks++;
+                    }
+                });
+            }
+
+            saveData();
+            updateCategorySelect();
+            renderAll();
+
+            if (addedLinks > 0 || addedCategories > 0) {
+                let toastMsg = `تمت الإضافة: ${addedLinks} رابط و ${addedCategories} تصنيف.`;
+                if (skippedLinks > 0 || skippedCategories > 0)
+                    toastMsg += ` (تجاهل ${skippedLinks} رابط و ${skippedCategories} تصنيف مكرر)`;
+                showToast(toastMsg, 'success');
+            } else {
+                showToast('جميع العناصر متزامنة وموجودة مسبقاً.', 'info');
+            }
+        }
+
         function handleImport(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -590,68 +987,7 @@
             reader.onload = function(ev) {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    let addedLinks = 0, addedCategories = 0, skippedLinks = 0, skippedCategories = 0;
-
-                    if (data.categories && Array.isArray(data.categories)) {
-                        data.categories.forEach(importedCat => {
-                            const exists = categories.some(c => c.name.trim().toLowerCase() === importedCat.name.trim().toLowerCase());
-                            if (!exists) {
-                                categories.push({ ...importedCat, id: 'cat_' + generateUniqueId() });
-                                addedCategories++;
-                            } else {
-                                skippedCategories++;
-                            }
-                        });
-                    }
-
-                    if (data.links && Array.isArray(data.links)) {
-                        data.links.forEach(importedLink => {
-                            const normalizedUrl = (importedLink.url || '').replace(/\/+$/, '').toLowerCase();
-                            const exists = links.some(l => (l.url || '').replace(/\/+$/, '').toLowerCase() === normalizedUrl);
-                            if (!exists) {
-                                let catId = importedLink.category || '';
-                                if (catId && !categories.some(c => c.id === catId)) {
-                                    const oldCat = data.categories?.find(c => c.id === catId);
-                                    if (oldCat) {
-                                        const matchedCat = categories.find(c => c.name.trim().toLowerCase() === oldCat.name.trim().toLowerCase());
-                                        catId = matchedCat ? matchedCat.id : '';
-                                    } else {
-                                        catId = '';
-                                    }
-                                }
-                                links.push({
-                                    id: generateUniqueId(),
-                                    name: importedLink.name || 'بدون عنوان',
-                                    url: importedLink.url,
-                                    category: catId,
-                                    favorite: importedLink.favorite === true,
-                                    description: importedLink.description || '',
-                                    favicon: getFavicon(importedLink.url),
-                                    domain: getDomain(importedLink.url),
-                                    date: importedLink.date || new Date().toLocaleDateString('ar-SA'),
-                                    timestamp: importedLink.timestamp || Date.now(),
-                                    hour: importedLink.hour !== undefined ? importedLink.hour : new Date().getHours(),
-                                    clicks: typeof importedLink.clicks === 'number' ? importedLink.clicks : 0
-                                });
-                                addedLinks++;
-                            } else {
-                                skippedLinks++;
-                            }
-                        });
-                    }
-
-                    saveData();
-                    updateCategorySelect();
-                    renderAll();
-
-                    if (addedLinks > 0 || addedCategories > 0) {
-                        let toastMsg = `تمت الإضافة: ${addedLinks} رابط و ${addedCategories} تصنيف.`;
-                        if (skippedLinks > 0 || skippedCategories > 0)
-                            toastMsg += ` (تجاهل ${skippedLinks} رابط و ${skippedCategories} تصنيف مكرر)`;
-                        showToast(toastMsg, 'success');
-                    } else {
-                        showToast('لم يتم إضافة أي جديد. جميع العناصر موجودة مسبقاً.', 'info');
-                    }
+                    mergeImportedObject(data);
                 } catch (err) {
                     console.error(err);
                     showToast('خطأ في قراءة الملف! تأكد من أنه ملف JSON صحيح.', 'error');
@@ -691,9 +1027,16 @@
             confirmCallback = null;
         }
 
-        function saveData() {
+        function saveData(skipCloudSync = false) {
             localStorage.setItem('linkvault_links', JSON.stringify(links));
             localStorage.setItem('linkvault_categories', JSON.stringify(categories));
+
+            if (!skipCloudSync && googleUserProfile && isGoogleTokenValid()) {
+                clearTimeout(autoSyncTimeout);
+                autoSyncTimeout = setTimeout(() => {
+                    uploadBackupToDrive(true);
+                }, 2000);
+            }
         }
 
         function showToast(msg, type = 'success') {
@@ -823,4 +1166,3 @@
                 openModal();
             }
         });
-   

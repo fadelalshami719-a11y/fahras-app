@@ -30,7 +30,9 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo-icon" onclick="handleLogoClick()" title="توسيع القائمة">
-                    <i class="fas fa-compass" id="logoMainIcon"></i>
+                    <!-- ضع مسار واسم صورتك هنا -->
+                    <img src="favicon/web-app-manifest-512x512.png" alt="شعار فِهرِس" class="logo-img" id="logoMainImg">
+                    <i class="fas fa-chevron-left logo-expand-icon"></i>
                 </div>
                 <span class="logo-text">فِهرِس</span>
                 <button class="sidebar-toggle" onclick="toggleSidebar()" title="طي القائمة">
@@ -219,6 +221,18 @@
                                         <i class="fas fa-cloud-download-alt"></i> استعادة من السحابة
                                     </button>
                                 </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <h4>توقيت المزامنة التلقائية</h4>
+                                    <p>اختر متى يتم رفع التغييرات تلقائياً إلى Google Drive</p>
+                                </div>
+                                <select id="syncFrequencySelect" class="sync-select" onchange="changeSyncFrequency(this.value)">
+                                    <option value="instant">فوري (عند كل إضافة أو تعديل)</option>
+                                    <option value="daily">تلقائي كل 24 ساعة</option>
+                                    <option value="manual">يدوي فقط</option>
+                                </select>
                             </div>
 
                             <div class="setting-item">

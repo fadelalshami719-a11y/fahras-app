@@ -8,6 +8,8 @@ let googleAccessToken = localStorage.getItem('fahras_google_token') || null;
 let googleTokenExpiry = Number(localStorage.getItem('fahras_google_expiry') || 0);
 let googleUserProfile = JSON.parse(localStorage.getItem('fahras_google_user') || 'null');
 let autoSyncTimeout = null;
+let liveSyncInterval = null;
+let lastKnownCloudModified = localStorage.getItem('fahras_cloud_mtime') || '';
 let isSyncingNow = false;
 
 // إعدادات المزامنة وسجل المحذوفات (لضمان عدم عودة العناصر المحذوفة بين الجوال واللابتوب)
@@ -303,6 +305,17 @@ async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
         });
 
         if (res.ok) {
+            const uploadedMeta = await res.json().catch(() => null);
+            if (uploadedMeta && uploadedMeta.modifiedTime) {
+                lastKnownCloudModified = uploadedMeta.modifiedTime;
+                localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
+            } else {
+                const freshFile = await findDriveBackupFile();
+                if (freshFile && freshFile.modifiedTime) {
+                    lastKnownCloudModified = freshFile.modifiedTime;
+                    localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
+                }
+            }
             syncSettings.lastDailySync = Date.now();
             saveSyncMeta();
             updateGoogleUI();
@@ -324,7 +337,7 @@ async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
 }
 
 // المزامنة الذكية: تدمج السحابة مع المحلي مع احترام عمليات الحذف وتحديثات الأجهزة الأخرى
-async function syncWithDrive(silent = true) {
+async function syncWithDrive(silent = true, notifyOnChange = false) {
     if (!googleUserProfile || isSyncingNow) return;
     const valid = await ensureValidGoogleToken(false);
     if (!valid) return;
@@ -401,18 +414,37 @@ async function syncWithDrive(silent = true) {
             });
         }
 
+        let needUploadToCloud = false;
+        if (Array.isArray(cloudData.links)) {
+            needUploadToCloud = links.some(l => {
+                const cLink = cloudData.links.find(cl => String(cl.id) === String(l.id));
+                return !cLink || (l.updatedAt || 0) > (cLink.updatedAt || 0);
+            });
+        }
+        if (Object.keys(syncTombstones.deletedLinks).length > Object.keys(cloudTomb.deletedLinks || {}).length) {
+            needUploadToCloud = true;
+        }
+
         if (localChanged) {
             localStorage.setItem('linkvault_links', JSON.stringify(links));
             localStorage.setItem('linkvault_categories', JSON.stringify(categories));
             updateCategorySelect();
             renderAll();
-            if (!silent) showToast('تمت مزامنة أحدث التغييرات من السحابة!', 'success');
+            if (file.modifiedTime) {
+                lastKnownCloudModified = file.modifiedTime;
+                localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
+            }
+            if (!silent || notifyOnChange) {
+                showToast('تم تحديث الفهرس تلقائياً من جهاز آخر!', 'info');
+            }
         } else if (!silent) {
             showToast('بياناتك محدّثة ومتطابقة مع السحابة', 'info');
         }
 
-        // إذا كان الجهاز يملك تغييرات أحدث من السحابة، نرفعها
-        await uploadBackupToDrive(true);
+        // الرفع فقط إذا كان الجهاز يملك تغييرات أحدث من السحابة
+        if (needUploadToCloud) {
+            await uploadBackupToDrive(true);
+        }
     } catch (err) {
         console.error('Sync error:', err);
     }
@@ -522,12 +554,40 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searchInput').addEventListener('input', function() {
         performSearch(this.value);
     });
+
+    startLiveSyncWatcher();
 });
+
+// ===== الفحص التلقائي للتحديثات من الأجهزة الأخرى =====
+async function checkForRemoteUpdates() {
+    if (!googleUserProfile || isSyncingNow) return;
+    if (syncSettings.frequency !== 'instant') return;
+    if (document.visibilityState !== 'visible') return;
+
+    // عدم المقاطعة إذا كان المستخدم يكتب داخل نافذة منبثقة
+    const anyModalOpen = document.querySelector('.modal-overlay.active');
+    if (anyModalOpen) return;
+
+    const file = await findDriveBackupFile();
+    if (!file || !file.modifiedTime) return;
+
+    if (file.modifiedTime !== lastKnownCloudModified) {
+        lastKnownCloudModified = file.modifiedTime;
+        localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
+        await syncWithDrive(true, true);
+    }
+}
+
+function startLiveSyncWatcher() {
+    if (liveSyncInterval) clearInterval(liveSyncInterval);
+    // فحص خفيف كل 20 ثانية للتأكد من وجود تعديلات من أجهزة أخرى
+    liveSyncInterval = setInterval(checkForRemoteUpdates, 20000);
+}
 
 // مزامنة تلقائية عند العودة لتبويب التطبيق من جهاز آخر
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && googleUserProfile && syncSettings.frequency === 'instant') {
-        syncWithDrive(true);
+        checkForRemoteUpdates();
     }
 });
 

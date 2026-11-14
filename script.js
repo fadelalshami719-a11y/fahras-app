@@ -8,6 +8,24 @@ let googleAccessToken = localStorage.getItem('fahras_google_token') || null;
 let googleTokenExpiry = Number(localStorage.getItem('fahras_google_expiry') || 0);
 let googleUserProfile = JSON.parse(localStorage.getItem('fahras_google_user') || 'null');
 let autoSyncTimeout = null;
+let isSyncingNow = false;
+
+// إعدادات المزامنة وسجل المحذوفات (لضمان عدم عودة العناصر المحذوفة بين الجوال واللابتوب)
+let syncSettings = JSON.parse(localStorage.getItem('fahras_sync_settings')) || {
+    frequency: 'instant', // 'instant' | 'daily' | 'manual'
+    lastDailySync: 0
+};
+
+let syncTombstones = JSON.parse(localStorage.getItem('fahras_tombstones')) || {
+    deletedLinks: {},      // { id: timestamp }
+    deletedCategories: {}, // { id: timestamp }
+    clearedAt: 0           // timestamp لآخر عملية "حذف الكل"
+};
+
+function saveSyncMeta() {
+    localStorage.setItem('fahras_sync_settings', JSON.stringify(syncSettings));
+    localStorage.setItem('fahras_tombstones', JSON.stringify(syncTombstones));
+}
 
 function generateUniqueId() {
     return Date.now() + '_' + Math.random().toString(36).substr(2, 10);
@@ -20,16 +38,17 @@ let links = (() => {
     return parsed.map(link => {
         if (typeof link.id === 'number') link.id = String(link.id);
         if (typeof link.clicks !== 'number') link.clicks = 0;
+        if (!link.updatedAt) link.updatedAt = link.timestamp || Date.now();
         return link;
     });
 })();
 
 let categories = JSON.parse(localStorage.getItem('linkvault_categories')) || [
-    { id: 'general', name: 'عام', icon: 'fas fa-globe', color: '#0ea5e9' },
-    { id: 'dev', name: 'تطوير', icon: 'fas fa-code', color: '#10b981' },
-    { id: 'design', name: 'تصميم', icon: 'fas fa-paint-brush', color: '#f43f5e' },
-    { id: 'edu', name: 'تعليم', icon: 'fas fa-graduation-cap', color: '#14b8a6' },
-    { id: 'news', name: 'أخبار', icon: 'fas fa-newspaper', color: '#f59e0b' }
+    { id: 'general', name: 'عام', icon: 'fas fa-globe', color: '#0ea5e9', updatedAt: 1 },
+    { id: 'dev', name: 'تطوير', icon: 'fas fa-code', color: '#10b981', updatedAt: 1 },
+    { id: 'design', name: 'تصميم', icon: 'fas fa-paint-brush', color: '#f43f5e', updatedAt: 1 },
+    { id: 'edu', name: 'تعليم', icon: 'fas fa-graduation-cap', color: '#14b8a6', updatedAt: 1 },
+    { id: 'news', name: 'أخبار', icon: 'fas fa-newspaper', color: '#f59e0b', updatedAt: 1 }
 ];
 
 let chartInstances = {};
@@ -63,7 +82,7 @@ function initGoogleAuth() {
             await fetchGoogleUserProfile();
             updateGoogleUI();
             showToast('تم تسجيل الدخول بنجاح! جارٍ مزامنة بياناتك...', 'success');
-            await syncOnLogin();
+            await syncWithDrive(true);
         }
     });
 }
@@ -72,7 +91,7 @@ function isGoogleTokenValid() {
     return googleAccessToken && Date.now() < (googleTokenExpiry - 60000);
 }
 
-async function ensureValidGoogleToken(interactive = true) {
+async function ensureValidGoogleToken(interactive = false) {
     if (isGoogleTokenValid()) return true;
     if (!tokenClient) initGoogleAuth();
     if (!tokenClient) return false;
@@ -143,6 +162,9 @@ function updateGoogleUI() {
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const sidebarName = document.getElementById('sidebarUserName');
     const sidebarStatus = document.getElementById('sidebarSyncStatus');
+    const freqSelect = document.getElementById('syncFrequencySelect');
+
+    if (freqSelect) freqSelect.value = syncSettings.frequency || 'instant';
 
     if (googleUserProfile) {
         if (loggedOutBox) loggedOutBox.style.display = 'none';
@@ -162,7 +184,14 @@ function updateGoogleUI() {
                 : `<i class="fab fa-google"></i><span>متصل</span>`;
         }
         if (sidebarName) sidebarName.textContent = googleUserProfile.name;
-        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cloud-check" style="color:var(--success);"></i> مزامنة مفعّلة`;
+
+        const modeText = {
+            instant: 'مزامنة فورية',
+            daily: 'مزامنة كل 24 ساعة',
+            manual: 'مزامنة يدوية'
+        }[syncSettings.frequency] || 'مزامنة مفعّلة';
+
+        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cloud-check" style="color:var(--success);"></i> ${modeText}`;
         if (sidebarAvatar) {
             if (googleUserProfile.picture) {
                 sidebarAvatar.innerHTML = `<img src="${googleUserProfile.picture}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
@@ -183,7 +212,22 @@ function updateGoogleUI() {
     }
 }
 
-// ===== دوال التعامل مع Google Drive (appDataFolder) =====
+function changeSyncFrequency(newFreq) {
+    syncSettings.frequency = newFreq;
+    saveSyncMeta();
+    updateGoogleUI();
+    const labels = {
+        instant: 'تم تفعيل المزامنة الفورية عند كل تعديل',
+        daily: 'تم ضبط المزامنة التلقائية كل 24 ساعة',
+        manual: 'تم ضبط المزامنة على الوضع اليدوي فقط'
+    };
+    showToast(labels[newFreq] || 'تم حفظ إعداد المزامنة', 'info');
+    if (newFreq === 'instant' && googleUserProfile) {
+        uploadBackupToDrive(true);
+    }
+}
+
+// ===== دوال التعامل مع Google Drive (مزامنة ذكية ثنائية الاتجاه) =====
 async function findDriveBackupFile() {
     const valid = await ensureValidGoogleToken(false);
     if (!valid) return null;
@@ -197,16 +241,34 @@ async function findDriveBackupFile() {
     return (data.files && data.files.length > 0) ? data.files[0] : null;
 }
 
-async function uploadBackupToDrive(silent = false) {
-    if (!googleUserProfile) return false;
-    const valid = await ensureValidGoogleToken(!silent);
-    if (!valid) return false;
+async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
+    if (!googleUserProfile || isSyncingNow) return false;
+    const valid = await ensureValidGoogleToken(interactiveAuth);
+    if (!valid) {
+        const syncLabel = document.getElementById('lastSyncLabel');
+        const sidebarStatus = document.getElementById('sidebarSyncStatus');
+        if (syncLabel) syncLabel.innerHTML = `<i class="fas fa-exclamation-circle" style="color:var(--warning);"></i> يلزم تجديد الجلسة`;
+        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> اضغط لتجديد المزامنة`;
+        if (!silent) showToast('انتهت جلسة Google، اضغط على زر "رفع الآن" لتجديدها', 'info');
+        return false;
+    }
 
+    isSyncingNow = true;
     try {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        Object.keys(syncTombstones.deletedLinks).forEach(id => {
+            if (syncTombstones.deletedLinks[id] < thirtyDaysAgo) delete syncTombstones.deletedLinks[id];
+        });
+        Object.keys(syncTombstones.deletedCategories).forEach(id => {
+            if (syncTombstones.deletedCategories[id] < thirtyDaysAgo) delete syncTombstones.deletedCategories[id];
+        });
+        saveSyncMeta();
+
         const existingFile = await findDriveBackupFile();
         const backupPayload = JSON.stringify({
             links,
             categories,
+            tombstones: syncTombstones,
             updatedAt: new Date().toISOString(),
             app: 'فهرس - فاضل الشامي'
         });
@@ -215,9 +277,7 @@ async function uploadBackupToDrive(silent = false) {
             name: DRIVE_BACKUP_FILENAME,
             mimeType: 'application/json'
         };
-        if (!existingFile) {
-            metadata.parents = ['appDataFolder'];
-        }
+        if (!existingFile) metadata.parents = ['appDataFolder'];
 
         const boundary = '-------fahras_boundary_2026';
         const multipartBody =
@@ -233,10 +293,8 @@ async function uploadBackupToDrive(silent = false) {
             ? `https://www.googleapis.com/upload/drive/v3/files/${existingFile.id}?uploadType=multipart`
             : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
 
-        const method = existingFile ? 'PATCH' : 'POST';
-
         const res = await fetch(url, {
-            method,
+            method: existingFile ? 'PATCH' : 'POST',
             headers: {
                 Authorization: `Bearer ${googleAccessToken}`,
                 'Content-Type': `multipart/related; boundary=${boundary}`
@@ -245,75 +303,134 @@ async function uploadBackupToDrive(silent = false) {
         });
 
         if (res.ok) {
+            syncSettings.lastDailySync = Date.now();
+            saveSyncMeta();
+            updateGoogleUI();
             const syncLabel = document.getElementById('lastSyncLabel');
             if (syncLabel) {
                 const timeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
                 syncLabel.innerHTML = `<i class="fas fa-check-circle"></i> آخر مزامنة: ${timeStr}`;
             }
-            if (!silent) showToast('تم حفظ النسخة الاحتياطية على Google Drive!', 'success');
+            if (!silent) showToast('تمت المزامنة وحفظ التغييرات على السحابة!', 'success');
             return true;
         }
     } catch (err) {
         console.error('Drive upload error:', err);
         if (!silent) showToast('حدث خطأ أثناء الرفع إلى Google Drive', 'error');
+    } finally {
+        isSyncingNow = false;
     }
     return false;
 }
 
-async function syncOnLogin() {
+// المزامنة الذكية: تدمج السحابة مع المحلي مع احترام عمليات الحذف وتحديثات الأجهزة الأخرى
+async function syncWithDrive(silent = true) {
+    if (!googleUserProfile || isSyncingNow) return;
+    const valid = await ensureValidGoogleToken(false);
+    if (!valid) return;
+
     const file = await findDriveBackupFile();
-    if (file) {
-        await downloadAndMergeDriveBackup(file.id, true);
-    } else {
+    if (!file) {
         await uploadBackupToDrive(true);
+        return;
+    }
+
+    try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+            headers: { Authorization: `Bearer ${googleAccessToken}` }
+        });
+        if (!res.ok) return;
+        const cloudData = await res.json();
+
+        const cloudTomb = cloudData.tombstones || { deletedLinks: {}, deletedCategories: {}, clearedAt: 0 };
+
+        // 1. توحيد سجل المحذوفات وتاريخ "حذف الكل" بين الجهاز والسحابة
+        const effectiveClearedAt = Math.max(syncTombstones.clearedAt || 0, cloudTomb.clearedAt || 0);
+        syncTombstones.clearedAt = effectiveClearedAt;
+
+        const mergedDeletedLinks = { ...cloudTomb.deletedLinks, ...syncTombstones.deletedLinks };
+        const mergedDeletedCats = { ...cloudTomb.deletedCategories, ...syncTombstones.deletedCategories };
+        syncTombstones.deletedLinks = mergedDeletedLinks;
+        syncTombstones.deletedCategories = mergedDeletedCats;
+        saveSyncMeta();
+
+        // 2. حذف العناصر المحلية التي تم حذفها في جهاز آخر أو قبل تاريخ "حذف الكل"
+        let localChanged = false;
+        const beforeLinksLen = links.length;
+        links = links.filter(l => {
+            const created = l.timestamp || 0;
+            if (created < effectiveClearedAt) return false;
+            if (mergedDeletedLinks[l.id]) return false;
+            return true;
+        });
+        if (links.length !== beforeLinksLen) localChanged = true;
+
+        const beforeCatsLen = categories.length;
+        categories = categories.filter(c => !mergedDeletedCats[c.id]);
+        if (categories.length !== beforeCatsLen) localChanged = true;
+
+        // 3. جلب الروابط والتصنيفات الجديدة أو المحدثة من السحابة (التي لم تُحذف)
+        if (Array.isArray(cloudData.categories)) {
+            cloudData.categories.forEach(cCat => {
+                if (mergedDeletedCats[cCat.id]) return;
+                const localIdx = categories.findIndex(c => c.id === cCat.id);
+                if (localIdx === -1) {
+                    categories.push(cCat);
+                    localChanged = true;
+                } else if ((cCat.updatedAt || 0) > (categories[localIdx].updatedAt || 0)) {
+                    categories[localIdx] = cCat;
+                    localChanged = true;
+                }
+            });
+        }
+
+        if (Array.isArray(cloudData.links)) {
+            cloudData.links.forEach(cLink => {
+                const created = cLink.timestamp || 0;
+                if (created < effectiveClearedAt) return;
+                if (mergedDeletedLinks[cLink.id]) return;
+
+                const localIdx = links.findIndex(l => String(l.id) === String(cLink.id));
+                if (localIdx === -1) {
+                    links.push(cLink);
+                    localChanged = true;
+                } else if ((cLink.updatedAt || 0) > (links[localIdx].updatedAt || 0)) {
+                    links[localIdx] = cLink;
+                    localChanged = true;
+                }
+            });
+        }
+
+        if (localChanged) {
+            localStorage.setItem('linkvault_links', JSON.stringify(links));
+            localStorage.setItem('linkvault_categories', JSON.stringify(categories));
+            updateCategorySelect();
+            renderAll();
+            if (!silent) showToast('تمت مزامنة أحدث التغييرات من السحابة!', 'success');
+        } else if (!silent) {
+            showToast('بياناتك محدّثة ومتطابقة مع السحابة', 'info');
+        }
+
+        // إذا كان الجهاز يملك تغييرات أحدث من السحابة، نرفعها
+        await uploadBackupToDrive(true);
+    } catch (err) {
+        console.error('Sync error:', err);
     }
 }
 
 async function manualSyncToDrive() {
     const valid = await ensureValidGoogleToken(true);
     if (!valid) {
-        showToast('يرجى إعادة تسجيل الدخول لتجديد الجلسة', 'info');
+        showToast('يرجى تسجيل الدخول لتجديد الجلسة', 'info');
         return;
     }
-    await uploadBackupToDrive(false);
+    await uploadBackupToDrive(false, true);
 }
 
 async function restoreFromDrive() {
     const valid = await ensureValidGoogleToken(true);
     if (!valid) return;
-
-    const file = await findDriveBackupFile();
-    if (!file) {
-        showToast('لا توجد نسخة احتياطية محفوظة على Google Drive حتى الآن', 'info');
-        return;
-    }
-    await downloadAndMergeDriveBackup(file.id, false);
-}
-
-async function downloadAndMergeDriveBackup(fileId, isAutoLogin = false) {
-    try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-            headers: { Authorization: `Bearer ${googleAccessToken}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (isAutoLogin && links.length === 0 && Array.isArray(data.links)) {
-            links = data.links;
-            if (Array.isArray(data.categories) && data.categories.length > 0) {
-                categories = data.categories;
-            }
-            saveData(true);
-            updateCategorySelect();
-            renderAll();
-            showToast(`تمت استعادة ${links.length} رابط من Google Drive!`, 'success');
-        } else {
-            mergeImportedObject(data);
-        }
-    } catch (err) {
-        console.error('Restore error:', err);
-        showToast('تعذر قراءة النسخة الاحتياطية من Drive', 'error');
-    }
+    await syncWithDrive(false);
 }
 
 function signOutGoogle() {
@@ -360,7 +477,7 @@ function deleteGoogleAccountAndData() {
     }, 'clear');
 }
 
-// ===== بقية منطق التطبيق الأساسي =====
+// ===== المظهر والتهيئة =====
 function initTheme() {
     const saved = localStorage.getItem('linkvault_theme') || 'dark';
     document.body.setAttribute('data-theme', saved);
@@ -376,7 +493,7 @@ function toggleTheme() {
     document.getElementById('themeToggle').checked = next === 'dark';
     updateThemeUI(next);
     showToast(next === 'dark' ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع النهاري', 'info');
-    if (currentView === 'statistics') setTimeout(() => renderCharts(), 300);
+    if (currentView === 'statistics') setTimeout(() => renderCharts(), 200);
 }
 
 function updateThemeUI(theme) {
@@ -394,37 +511,28 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCategorySelect();
     renderAll();
 
-    if (googleUserProfile && isGoogleTokenValid()) {
-        syncOnLogin();
+    // التحقق من المزامنة عند فتح التطبيق
+    if (googleUserProfile) {
+        const dayMs = 24 * 60 * 60 * 1000;
+        if (syncSettings.frequency === 'instant' || (syncSettings.frequency === 'daily' && (Date.now() - syncSettings.lastDailySync) >= dayMs)) {
+            syncWithDrive(true);
+        }
     }
 
     document.getElementById('searchInput').addEventListener('input', function() {
         performSearch(this.value);
     });
+});
 
-    const logoBox = document.querySelector('.logo-icon');
-    const logoIcon = document.getElementById('logoMainIcon');
-    const sidebar = document.getElementById('sidebar');
-
-    if (logoBox && logoIcon && sidebar) {
-        logoBox.addEventListener('mouseenter', () => {
-            if (sidebar.classList.contains('collapsed')) {
-                logoIcon.className = 'fas fa-chevron-left';
-            }
-        });
-        logoBox.addEventListener('mouseleave', () => {
-            logoIcon.className = 'fas fa-compass';
-        });
+// مزامنة تلقائية عند العودة لتبويب التطبيق من جهاز آخر
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && googleUserProfile && syncSettings.frequency === 'instant') {
+        syncWithDrive(true);
     }
 });
 
 function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const logoIcon = document.getElementById('logoMainIcon');
-    sidebar.classList.toggle('collapsed');
-    if (!sidebar.classList.contains('collapsed')) {
-        logoIcon.className = 'fas fa-compass';
-    }
+    document.getElementById('sidebar').classList.toggle('collapsed');
 }
 
 function handleLogoClick() {
@@ -465,12 +573,10 @@ function showView(view, element) {
         settings: 'الإعدادات'
     }[view] || 'فِهرِس';
 
-    // إغلاق قائمة الهاتف والطبقة المعتمة عند الانتقال لأي قسم
     document.getElementById('sidebar').classList.remove('active');
     const overlay = document.getElementById('sidebarOverlay');
     if (overlay) overlay.classList.remove('active');
 
-    // إظهار زر الإضافة العائم فقط في واجهة الروابط على الجوال
     const fabBtn = document.querySelector('.mobile-fab-btn');
     if (fabBtn) {
         fabBtn.style.visibility = (view === 'dashboard') ? 'visible' : 'hidden';
@@ -670,6 +776,8 @@ function showCategoryDetail(catId, switchView = true) {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
         document.getElementById('categoryDetailView').classList.add('active');
+        const fabBtn = document.querySelector('.mobile-fab-btn');
+        if (fabBtn) fabBtn.style.visibility = 'visible';
     }
     document.getElementById('categoryDetailTitle').innerHTML = `<i class="fas fa-folder" style="color:${cat.color}"></i> ${escapeHtml(cat.name)}`;
     const catLinks = links.filter(l => l.category === catId);
@@ -724,6 +832,7 @@ function selectColor(el) {
     el.classList.add('selected');
 }
 
+// ===== إجراءات الأزرار المرتبطة بالمزامنة =====
 function saveLink(e) {
     e.preventDefault();
     const name = document.getElementById('siteName').value.trim();
@@ -740,18 +849,21 @@ function saveLink(e) {
                 ...links[idx],
                 name, url, category, favorite, description,
                 favicon: getFavicon(url),
-                domain: getDomain(url)
+                domain: getDomain(url),
+                updatedAt: Date.now()
             };
             showToast('تم تحديث الرابط بنجاح!', 'success');
         }
     } else {
+        const now = Date.now();
         const newLink = {
             id: generateUniqueId(),
             name, url, category, favorite, description,
             favicon: getFavicon(url),
             domain: getDomain(url),
             date: new Date().toLocaleDateString('ar-SA'),
-            timestamp: Date.now(),
+            timestamp: now,
+            updatedAt: now,
             hour: new Date().getHours(),
             clicks: 0
         };
@@ -773,11 +885,11 @@ function saveCategory(e) {
     if (editingCategoryId) {
         const idx = categories.findIndex(c => c.id === editingCategoryId);
         if (idx !== -1) {
-            categories[idx] = { ...categories[idx], name, icon, color };
+            categories[idx] = { ...categories[idx], name, icon, color, updatedAt: Date.now() };
             showToast('تم تحديث التصنيف بنجاح!', 'success');
         }
     } else {
-        categories.push({ id: 'cat_' + generateUniqueId(), name, icon, color });
+        categories.push({ id: 'cat_' + generateUniqueId(), name, icon, color, updatedAt: Date.now() });
         showToast('تم إنشاء التصنيف بنجاح!', 'success');
     }
 
@@ -804,8 +916,11 @@ function editCategory(id) {
 function deleteLink(id) {
     const link = links.find(l => String(l.id) === String(id));
     if (!link) return;
-    showConfirmModal(`هل أنت متأكد من حذف الرابط "${link.name}"؟ لا يمكن التراجع.`, () => {
+    showConfirmModal(`هل أنت متأكد من حذف الرابط "${link.name}"؟ سيتم حذفه من السحابة أيضاً.`, () => {
         links = links.filter(l => String(l.id) !== String(id));
+        // تسجيل الرابط في سجل المحذوفات حتى لا يعود من السحابة
+        syncTombstones.deletedLinks[String(id)] = Date.now();
+        saveSyncMeta();
         saveData();
         renderAll();
         showToast('تم حذف الرابط بنجاح', 'error');
@@ -820,9 +935,17 @@ function deleteCategory(id) {
         ? `التصنيف "${cat.name}" يحتوي على ${count} رابط. سيتم نقل الروابط إلى "بدون تصنيف". هل تريد المتابعة؟`
         : `هل أنت متأكد من حذف التصنيف "${cat.name}"؟`;
     showConfirmModal(msg, () => {
-        links.forEach(l => { if (l.category === id) l.category = ''; });
+        links.forEach(l => {
+            if (l.category === id) {
+                l.category = '';
+                l.updatedAt = Date.now();
+            }
+        });
         if (currentFilter === id) currentFilter = 'all';
         categories = categories.filter(c => c.id !== id);
+        // تسجيل التصنيف في سجل المحذوفات
+        syncTombstones.deletedCategories[String(id)] = Date.now();
+        saveSyncMeta();
         saveData();
         renderAll();
         updateCategorySelect();
@@ -831,20 +954,32 @@ function deleteCategory(id) {
 }
 
 function clearAllData() {
-    showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات المحلية بشكل نهائي. هل أنت متأكد؟', () => {
+    showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات نهائياً من هذا الجهاز ومن السحابة. هل أنت متأكد؟', async () => {
         links = [];
         currentFilter = 'all';
         categories = [
-            { id:'general', name:'عام', icon:'fas fa-globe', color:'#0ea5e9' },
-            { id:'dev', name:'تطوير', icon:'fas fa-code', color:'#10b981' },
-            { id:'design', name:'تصميم', icon:'fas fa-paint-brush', color:'#f43f5e' },
-            { id:'edu', name:'تعليم', icon:'fas fa-graduation-cap', color:'#14b8a6' },
-            { id:'news', name:'أخبار', icon:'fas fa-newspaper', color:'#f59e0b' }
+            { id:'general', name:'عام', icon:'fas fa-globe', color:'#0ea5e9', updatedAt: Date.now() },
+            { id:'dev', name:'تطوير', icon:'fas fa-code', color:'#10b981', updatedAt: Date.now() },
+            { id:'design', name:'تصميم', icon:'fas fa-paint-brush', color:'#f43f5e', updatedAt: Date.now() },
+            { id:'edu', name:'تعليم', icon:'fas fa-graduation-cap', color:'#14b8a6', updatedAt: Date.now() },
+            { id:'news', name:'أخبار', icon:'fas fa-newspaper', color:'#f59e0b', updatedAt: Date.now() }
         ];
-        saveData();
+
+        // تسجيل وقت "حذف الكل" لمنع استعادة أي روابط قديمة من الأجهزة الأخرى
+        syncTombstones.clearedAt = Date.now();
+        syncTombstones.deletedLinks = {};
+        saveSyncMeta();
+
+        localStorage.setItem('linkvault_links', JSON.stringify(links));
+        localStorage.setItem('linkvault_categories', JSON.stringify(categories));
         renderAll();
         updateCategorySelect();
-        showToast('تم حذف جميع البيانات المحلية', 'error');
+        showToast('تم حذف جميع البيانات ومزامنة الحذف مع السحابة', 'error');
+
+        // رفع حالة الإفراغ فوراً إلى Google Drive بغض النظر عن التوقيت
+        if (googleUserProfile) {
+            await uploadBackupToDrive(true, true);
+        }
     }, 'clear');
 }
 
@@ -867,6 +1002,7 @@ function toggleFavorite(id) {
     const link = links.find(l => String(l.id) === String(id));
     if (link) {
         link.favorite = !link.favorite;
+        link.updatedAt = Date.now();
         saveData();
         renderAll();
         showToast(link.favorite ? 'ثُبّت في شريط المفضلة!' : 'أُزيل من المفضلة', 'info');
@@ -892,6 +1028,7 @@ function visitLink(url, id) {
         if (link) {
             link.clicks = (link.clicks || 0) + 1;
             link.lastVisited = Date.now();
+            link.updatedAt = Date.now();
             saveData();
             renderPinnedFavorites();
             renderRecentCards();
@@ -941,7 +1078,7 @@ function mergeImportedObject(data) {
         data.categories.forEach(importedCat => {
             const exists = categories.some(c => c.name.trim().toLowerCase() === importedCat.name.trim().toLowerCase());
             if (!exists) {
-                categories.push({ ...importedCat, id: 'cat_' + generateUniqueId() });
+                categories.push({ ...importedCat, id: 'cat_' + generateUniqueId(), updatedAt: Date.now() });
                 addedCategories++;
             } else {
                 skippedCategories++;
@@ -964,6 +1101,7 @@ function mergeImportedObject(data) {
                         catId = '';
                     }
                 }
+                const now = Date.now();
                 links.push({
                     id: generateUniqueId(),
                     name: importedLink.name || 'بدون عنوان',
@@ -974,7 +1112,8 @@ function mergeImportedObject(data) {
                     favicon: getFavicon(importedLink.url),
                     domain: getDomain(importedLink.url),
                     date: importedLink.date || new Date().toLocaleDateString('ar-SA'),
-                    timestamp: importedLink.timestamp || Date.now(),
+                    timestamp: now,
+                    updatedAt: now,
                     hour: importedLink.hour !== undefined ? importedLink.hour : new Date().getHours(),
                     clicks: typeof importedLink.clicks === 'number' ? importedLink.clicks : 0
                 });
@@ -1047,15 +1186,23 @@ function closeConfirmModal() {
     confirmCallback = null;
 }
 
+// دالة الحفظ المركزية التي تحترم إعداد توقيت المزامنة (فوري / 24 ساعة / يدوي)
 function saveData(skipCloudSync = false) {
     localStorage.setItem('linkvault_links', JSON.stringify(links));
     localStorage.setItem('linkvault_categories', JSON.stringify(categories));
 
-    if (!skipCloudSync && googleUserProfile && isGoogleTokenValid()) {
+    if (skipCloudSync || !googleUserProfile) return;
+
+    if (syncSettings.frequency === 'instant') {
         clearTimeout(autoSyncTimeout);
         autoSyncTimeout = setTimeout(() => {
-            uploadBackupToDrive(true);
-        }, 2000);
+            uploadBackupToDrive(true, false);
+        }, 1500);
+    } else if (syncSettings.frequency === 'daily') {
+        const dayMs = 24 * 60 * 60 * 1000;
+        if ((Date.now() - syncSettings.lastDailySync) >= dayMs) {
+            uploadBackupToDrive(true, false);
+        }
     }
 }
 
@@ -1189,7 +1336,6 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// إغلاق قائمة الهاتف والطبقة المعتمة تلقائياً عند الانتقال لشاشة أكبر
 window.addEventListener('resize', () => {
     if (window.innerWidth > 768) {
         document.getElementById('sidebar')?.classList.remove('active');

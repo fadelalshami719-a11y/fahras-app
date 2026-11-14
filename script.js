@@ -292,8 +292,8 @@ async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
             `--${boundary}--`;
 
         const url = existingFile
-            ? `https://www.googleapis.com/upload/drive/v3/files/${existingFile.id}?uploadType=multipart`
-            : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+            ? `https://www.googleapis.com/upload/drive/v3/files/${existingFile.id}?uploadType=multipart&fields=id,modifiedTime`
+            : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime`;
 
         const res = await fetch(url, {
             method: existingFile ? 'PATCH' : 'POST',
@@ -414,6 +414,7 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
             });
         }
 
+        // التحقق مما إذا كان الجهاز المحلي يملك بيانات أحدث تستدعي الرفع للسحابة
         let needUploadToCloud = false;
         if (Array.isArray(cloudData.links)) {
             needUploadToCloud = links.some(l => {
@@ -421,7 +422,16 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
                 return !cLink || (l.updatedAt || 0) > (cLink.updatedAt || 0);
             });
         }
+        if (Array.isArray(cloudData.categories) && !needUploadToCloud) {
+            needUploadToCloud = categories.some(c => {
+                const cCat = cloudData.categories.find(cc => cc.id === c.id);
+                return !cCat || (c.updatedAt || 0) > (cCat.updatedAt || 0);
+            });
+        }
         if (Object.keys(syncTombstones.deletedLinks).length > Object.keys(cloudTomb.deletedLinks || {}).length) {
+            needUploadToCloud = true;
+        }
+        if (syncTombstones.clearedAt > (cloudTomb.clearedAt || 0)) {
             needUploadToCloud = true;
         }
 
@@ -441,7 +451,7 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
             showToast('بياناتك محدّثة ومتطابقة مع السحابة', 'info');
         }
 
-        // الرفع فقط إذا كان الجهاز يملك تغييرات أحدث من السحابة
+        // الرفع فقط إذا كان الجهاز يملك تغييرات أحدث من السحابة (لمنع الرفع المزدوج)
         if (needUploadToCloud) {
             await uploadBackupToDrive(true);
         }
@@ -558,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
     startLiveSyncWatcher();
 });
 
-// ===== الفحص التلقائي للتحديثات من الأجهزة الأخرى =====
+// ===== الفحص التلقائي السريع للتحديثات من الأجهزة الأخرى =====
 async function checkForRemoteUpdates() {
     if (!googleUserProfile || isSyncingNow) return;
     if (syncSettings.frequency !== 'instant') return;
@@ -580,13 +590,19 @@ async function checkForRemoteUpdates() {
 
 function startLiveSyncWatcher() {
     if (liveSyncInterval) clearInterval(liveSyncInterval);
-    // فحص خفيف كل 20 ثانية للتأكد من وجود تعديلات من أجهزة أخرى
-    liveSyncInterval = setInterval(checkForRemoteUpdates, 20000);
+    // فحص خفيف كل 4 ثوانٍ لاكتشاف التعديلات من الأجهزة الأخرى بسرعة
+    liveSyncInterval = setInterval(checkForRemoteUpdates, 4000);
 }
 
-// مزامنة تلقائية عند العودة لتبويب التطبيق من جهاز آخر
+// مزامنة فورية عند العودة لتبويب التطبيق أو النقر على النافذة
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && googleUserProfile && syncSettings.frequency === 'instant') {
+        checkForRemoteUpdates();
+    }
+});
+
+window.addEventListener('focus', () => {
+    if (googleUserProfile && syncSettings.frequency === 'instant') {
         checkForRemoteUpdates();
     }
 });
@@ -978,7 +994,6 @@ function deleteLink(id) {
     if (!link) return;
     showConfirmModal(`هل أنت متأكد من حذف الرابط "${link.name}"؟ سيتم حذفه من السحابة أيضاً.`, () => {
         links = links.filter(l => String(l.id) !== String(id));
-        // تسجيل الرابط في سجل المحذوفات حتى لا يعود من السحابة
         syncTombstones.deletedLinks[String(id)] = Date.now();
         saveSyncMeta();
         saveData();
@@ -1003,7 +1018,6 @@ function deleteCategory(id) {
         });
         if (currentFilter === id) currentFilter = 'all';
         categories = categories.filter(c => c.id !== id);
-        // تسجيل التصنيف في سجل المحذوفات
         syncTombstones.deletedCategories[String(id)] = Date.now();
         saveSyncMeta();
         saveData();
@@ -1025,7 +1039,6 @@ function clearAllData() {
             { id:'news', name:'أخبار', icon:'fas fa-newspaper', color:'#f59e0b', updatedAt: Date.now() }
         ];
 
-        // تسجيل وقت "حذف الكل" لمنع استعادة أي روابط قديمة من الأجهزة الأخرى
         syncTombstones.clearedAt = Date.now();
         syncTombstones.deletedLinks = {};
         saveSyncMeta();
@@ -1036,7 +1049,6 @@ function clearAllData() {
         updateCategorySelect();
         showToast('تم حذف جميع البيانات ومزامنة الحذف مع السحابة', 'error');
 
-        // رفع حالة الإفراغ فوراً إلى Google Drive بغض النظر عن التوقيت
         if (googleUserProfile) {
             await uploadBackupToDrive(true, true);
         }
@@ -1246,7 +1258,7 @@ function closeConfirmModal() {
     confirmCallback = null;
 }
 
-// دالة الحفظ المركزية التي تحترم إعداد توقيت المزامنة (فوري / 24 ساعة / يدوي)
+// دالة الحفظ المركزية السريعة
 function saveData(skipCloudSync = false) {
     localStorage.setItem('linkvault_links', JSON.stringify(links));
     localStorage.setItem('linkvault_categories', JSON.stringify(categories));
@@ -1257,7 +1269,7 @@ function saveData(skipCloudSync = false) {
         clearTimeout(autoSyncTimeout);
         autoSyncTimeout = setTimeout(() => {
             uploadBackupToDrive(true, false);
-        }, 1500);
+        }, 400);
     } else if (syncSettings.frequency === 'daily') {
         const dayMs = 24 * 60 * 60 * 1000;
         if ((Date.now() - syncSettings.lastDailySync) >= dayMs) {

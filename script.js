@@ -163,8 +163,12 @@ function updateGoogleUI() {
         }
         if (sidebarName) sidebarName.textContent = googleUserProfile.name;
         if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cloud-check" style="color:var(--success);"></i> مزامنة مفعّلة`;
-        if (sidebarAvatar && googleUserProfile.picture) {
-            sidebarAvatar.innerHTML = `<img src="${googleUserProfile.picture}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
+        if (sidebarAvatar) {
+            if (googleUserProfile.picture) {
+                sidebarAvatar.innerHTML = `<img src="${googleUserProfile.picture}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
+            } else {
+                sidebarAvatar.textContent = googleUserProfile.name.charAt(0);
+            }
         }
     } else {
         if (loggedOutBox) loggedOutBox.style.display = 'block';
@@ -465,6 +469,12 @@ function showView(view, element) {
     document.getElementById('sidebar').classList.remove('active');
     const overlay = document.getElementById('sidebarOverlay');
     if (overlay) overlay.classList.remove('active');
+
+    // إظهار زر الإضافة العائم فقط في واجهة الروابط على الجوال
+    const fabBtn = document.querySelector('.mobile-fab-btn');
+    if (fabBtn) {
+        fabBtn.style.visibility = (view === 'dashboard') ? 'visible' : 'hidden';
+    }
 
     if (view === 'dashboard') renderAll();
     if (view === 'categories') renderCategories();

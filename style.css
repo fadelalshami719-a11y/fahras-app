@@ -1,10 +1,3 @@
-إليك الكود الكامل والنظيف لملف **`style.css`** بدون أي ترقيع أو إضافة طبقات فوق طبقات؛ تم دمج تحسينات الأداء والسرعة مباشرة في أصل القواعد الأساسية، مع إلغاء التأثيرات الزجاجية الثقيلة (`backdrop-filter`) في جميع المقاسات واستبدالها بأسطح صلبة عصرية، أنيقة، وسريعة الاستجابة (60fps) على الجوال والحاسوب، بالإضافة إلى دعم الوضع الليلي والنهاري وتصميم الجوال المدمج.
-
-ملاحظة: ملفا **`index.html`** و **`script.js`** اللذان أرسلتهما لك في الرد قبل السابق هما نظيفان وجاهزان بالكامل ويعملان مباشرة مع ملف الـ CSS الموحد هذا.
-
-### كود `style.css` الكامل والنظيف
-
-```css
 :root {
     --primary: #0ea5e9;
     --primary-dark: #0284c7;
@@ -122,61 +115,102 @@ body {
 }
 .sidebar.collapsed { width: 82px; }
 
+/* ===== بانر ترويسة القائمة الجانبية مع الصورة ===== */
 .sidebar-header {
-    padding: 22px 18px 16px;
+    margin: 12px 12px 6px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #0c192e 0%, #0f2942 100%);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 18px;
     display: flex;
     align-items: center;
     gap: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
+
+[data-theme="light"] .sidebar-header {
+    background: linear-gradient(135deg, #e0f2fe 0%, #ccfbf1 100%);
+    border-color: rgba(14, 165, 233, 0.35);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+}
+
 .logo-icon {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    border-radius: 15px;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    color: white;
     flex-shrink: 0;
-    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.3);
+    overflow: hidden;
+    position: relative;
+    background: transparent;
     transition: transform 0.2s ease;
 }
+
+.logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 13px;
+    display: block;
+}
+
+.logo-expand-icon {
+    display: none;
+    font-size: 1.1rem;
+    color: #ffffff;
+}
+
 .logo-text {
-    font-size: 1.55rem;
+    font-size: 1.5rem;
     font-weight: 900;
-    letter-spacing: -0.5px;
-    background: linear-gradient(135deg, var(--primary-light), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.3px;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+[data-theme="light"] .logo-text {
+    color: #0369a1;
 }
 
 .sidebar-toggle {
     margin-right: auto;
     width: 32px;
     height: 32px;
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--primary-light);
+    color: #38bdf8;
     font-size: 0.85rem;
     flex-shrink: 0;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+[data-theme="light"] .sidebar-toggle {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(14, 165, 233, 0.25);
+    color: #0284c7;
+}
+
 .sidebar-toggle:hover {
     background: var(--primary);
-    color: white;
+    color: #ffffff;
     border-color: transparent;
 }
 
+/* حالة القائمة الجانبية وهي مطوية */
 .sidebar.collapsed .sidebar-header {
+    margin: 12px 10px 6px;
+    padding: 10px;
     justify-content: center;
-    padding: 20px 10px 14px;
     gap: 0;
 }
+
 .sidebar.collapsed .sidebar-toggle,
 .sidebar.collapsed .logo-text,
 .sidebar.collapsed .nav-text,
@@ -184,7 +218,22 @@ body {
 .sidebar.collapsed .user-details {
     display: none !important;
 }
-.sidebar.collapsed .logo-icon { cursor: pointer; }
+
+.sidebar.collapsed .logo-icon {
+    cursor: pointer;
+}
+
+.sidebar.collapsed .logo-icon:hover {
+    background: var(--primary);
+}
+
+.sidebar.collapsed .logo-icon:hover .logo-img {
+    display: none;
+}
+
+.sidebar.collapsed .logo-icon:hover .logo-expand-icon {
+    display: block;
+}
 
 .sidebar-nav {
     flex: 1;
@@ -947,6 +996,11 @@ body {
     gap: 12px;
     box-shadow: var(--shadow);
 }
+
+/* إخفاء شريط الحقوق المختصر فقط عند فتح تبويب الإعدادات */
+.content-area:has(#settingsView.active) + .app-footer {
+    display: none !important;
+}
 .footer-rights {
     font-size: 0.86rem;
     color: var(--text-secondary);
@@ -1256,6 +1310,17 @@ body {
     .categories-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 155px), 1fr)); gap: 12px; }
     .category-card { padding: 15px 12px; }
     .category-icon { width: 46px; height: 46px; font-size: 1.25rem; margin-bottom: 10px; }
+    .category-actions {
+        width: 100%;
+        padding-top: 10px;
+        margin-top: 10px;
+        border-top: 1px dashed var(--border);
+        gap: 10px;
+    }
+    .cat-action-btn {
+        flex: 1;
+        height: 36px;
+    }
 
     .stats-dashboard { grid-template-columns: 1fr; }
     .stats-dashboard .stat-box:last-child { grid-column: auto; }
@@ -1305,4 +1370,16 @@ body {
     .pinned-item { min-width: 145px; padding: 8px 12px; }
 }
 
-```
+.sync-select {
+    padding: 9px 14px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    min-width: 210px;
+}
+.sync-select:focus { outline: none; border-color: var(--primary); }

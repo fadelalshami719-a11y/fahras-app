@@ -56,9 +56,9 @@
             </nav>
             <div class="sidebar-footer">
                 <div class="user-info" id="settingsTrigger" onclick="showView('settings', this)">
-                    <div class="user-avatar" id="sidebarAvatar">ف</div>
+                    <div class="user-avatar" id="sidebarAvatar">م</div>
                     <div class="user-details">
-                        <div class="user-name" id="sidebarUserName">مستخدم جدبد</div>
+                        <div class="user-name" id="sidebarUserName">مستخدم جديد</div>
                         <div class="user-role" id="sidebarSyncStatus"><i class="fas fa-cog"></i> الإعدادات والنسخ</div>
                     </div>
                 </div>
@@ -96,7 +96,7 @@
                         <div class="pinned-strip" id="pinnedFavoritesStrip"></div>
                     </div>
 
-                    <div class="section-header">
+                    <div class="section-header library-header">
                         <h2><i class="fas fa-layer-group"></i> مكتبة الروابط</h2>
                         <div class="header-controls">
                             <div class="sort-switcher">
@@ -107,7 +107,7 @@
                                     <i class="fas fa-fire"></i> الأكثر زيارة
                                 </button>
                             </div>
-                            <button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> إضافة رابط</button>
+                            <button class="btn btn-primary desktop-add-btn" onclick="openModal()"><i class="fas fa-plus"></i> إضافة رابط</button>
                         </div>
                     </div>
 
@@ -287,15 +287,21 @@
             <footer class="app-footer">
                 <div class="footer-rights">
                     <i class="fas fa-code" style="color:var(--primary-light);"></i>
-                    <span>جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong></span>
+                    <span class="desktop-rights">جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong></span>
+                    <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <strong>فاضل الشامي</strong></span>
                 </div>
                 <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill" title="راسلني عبر واتساب">
-                    <i class="fab fa-whatsapp" style="font-size:1.1rem;"></i>
-                    <span>+963 944 650 364</span>
+                    <i class="fab fa-whatsapp"></i>
+                    <span class="wa-number">+963 944 650 364</span>
                 </a>
             </footer>
         </main>
     </div>
+
+    <!-- زر الإضافة العائم للجوال (FAB) -->
+    <button class="mobile-fab-btn" onclick="openModal()" aria-label="إضافة رابط جديد" title="إضافة رابط جديد">
+        <i class="fas fa-plus"></i>
+    </button>
 
     <!-- Add/Edit Link Modal -->
     <div class="modal-overlay" id="linkModal">

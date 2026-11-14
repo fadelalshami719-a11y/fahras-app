@@ -2,9 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>فِهرِس - بوابتك الذكية للروابط</title>
-     <!-- 1. أيقونات المتصفح -->
+    <!-- 1. أيقونات المتصفح -->
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
     <link rel="shortcut icon" href="favicon/favicon.ico" />
@@ -21,6 +21,10 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
+
+    <!-- طبقة التعتيم الخلفية للقائمة الجانبية في الهواتف -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
@@ -54,12 +58,9 @@
                 <div class="user-info" id="settingsTrigger" onclick="showView('settings', this)">
                     <div class="user-avatar" id="sidebarAvatar">ف</div>
                     <div class="user-details">
-                        <div class="user-name" id="sidebarUserName">فاضل الشامي</div>
+                        <div class="user-name" id="sidebarUserName">مستخدم جدبد</div>
                         <div class="user-role" id="sidebarSyncStatus"><i class="fas fa-cog"></i> الإعدادات والنسخ</div>
                     </div>
-                    <a href="https://wa.me/963944650364" target="_blank" class="sidebar-wa-btn" title="تواصل عبر واتساب" onclick="event.stopPropagation()">
-                        <i class="fab fa-whatsapp"></i>
-                    </a>
                 </div>
             </div>
         </aside>
@@ -68,7 +69,7 @@
         <main class="main-content">
             <header class="navbar">
                 <div class="navbar-left">
-                    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()"><i class="fas fa-bars"></i></button>
+                    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="فتح القائمة"><i class="fas fa-bars"></i></button>
                     <h1 class="page-title" id="pageTitle">فِهرِس الروابط</h1>
                 </div>
                 <div class="navbar-right">

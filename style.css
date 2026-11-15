@@ -1383,3 +1383,42 @@ body {
     min-width: 210px;
 }
 .sync-select:focus { outline: none; border-color: var(--primary); }
+/* ===== نافذة سياسة الخصوصية والترحيب المنبثقة ===== */
+.privacy-welcome-modal {
+    max-width: 520px;
+}
+.privacy-modal-intro p {
+    font-size: 0.93rem;
+    color: var(--text-secondary);
+    line-height: 1.75;
+    margin-bottom: 12px;
+}
+.privacy-modal-intro .en-note {
+    font-size: 0.83rem;
+    color: var(--text-muted);
+    background: var(--input-bg);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    line-height: 1.6;
+}
+.privacy-modal-links {
+    margin: 14px 0 16px;
+}
+.dont-show-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    user-select: none;
+    padding: 6px 4px;
+}
+.dont-show-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}

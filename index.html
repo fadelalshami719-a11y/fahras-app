@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>فِهرِس - بوابتك الذكية للروابط</title>
+    <!-- الصق هنا وسم التحقق من Google Search Console -->
+    <!-- <meta name="google-site-verification" content="ضع_الرمز_هنا" /> -->
     <!-- 1. أيقونات المتصفح -->
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
@@ -14,6 +16,7 @@
     <link rel="manifest" href="favicon/site.webmanifest" />
     <!-- 4. لون شريط المتصفح -->
     <meta name="theme-color" content="#0088cc">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://www.google.com; img-src 'self' data: https://www.google.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://icons.duckduckgo.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'none'; form-action 'self';">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -41,23 +44,23 @@
             </div>
             <nav class="sidebar-nav">
                 <div class="section-title">التنقل الرئيسي</div>
-                <a href="#" class="nav-item active" onclick="showView('dashboard', this)">
+                <a href="#" class="nav-item active" id="navDashboard" data-view="dashboard">
                     <i class="fas fa-link"></i>
                     <span class="nav-text">الروابط</span>
                     <span class="badge" id="totalBadge">0</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('categories', this)">
+                <a href="#" class="nav-item" id="navCategories" data-view="categories">
                     <i class="fas fa-folder"></i>
                     <span class="nav-text">التصنيفات</span>
                     <span class="badge" id="catBadge">0</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('statistics', this)">
+                <a href="#" class="nav-item" id="navStatistics" data-view="statistics">
                     <i class="fas fa-chart-pie"></i>
                     <span class="nav-text">الإحصائيات</span>
                 </a>
             </nav>
             <div class="sidebar-footer">
-                <div class="user-info" id="settingsTrigger" onclick="showView('settings', this)">
+                <div class="user-info" id="settingsTrigger" data-view="settings">
                     <div class="user-avatar" id="sidebarAvatar">م</div>
                     <div class="user-details">
                         <div class="user-name" id="sidebarUserName">مستخدم جديد</div>
@@ -278,12 +281,17 @@
                         <div class="setting-item">
                             <div class="setting-info">
                                 <h4>تطوير وتصميم: فاضل الشامي</h4>
-                                <p>جميع الحقوق محفوظة لتطبيق فِهرِس © 2026</p>
+                                <p>مشروع مفتوح المصدر للاستخدام غير التجاري © 2026</p>
                             </div>
-                            <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill">
-                                <i class="fab fa-whatsapp"></i>
-                                <span>+963 944 650 364</span>
-                            </a>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <a href="privacy.html" class="btn btn-secondary" style="text-decoration:none;padding:7px 14px;font-size:0.84rem;">
+                                    <i class="fas fa-shield-alt"></i> سياسة الخصوصية
+                                </a>
+                                <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill">
+                                    <i class="fab fa-whatsapp"></i>
+                                    <span>+963 944 650 364</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -301,8 +309,8 @@
             <footer class="app-footer">
                 <div class="footer-rights">
                     <i class="fas fa-code" style="color:var(--primary-light);"></i>
-                    <span class="desktop-rights">جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong></span>
-                    <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <strong>فاضل الشامي</strong></span>
+                    <span class="desktop-rights">جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong> • <a href="privacy.html" style="color:var(--primary-light);text-decoration:none;">سياسة الخصوصية</a></span>
+                    <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <a href="privacy.html" style="color:var(--primary-light);text-decoration:none;">الخصوصية</a></span>
                 </div>
                 <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill" title="راسلني عبر واتساب">
                     <i class="fab fa-whatsapp"></i>

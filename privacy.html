@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>سياسة الخصوصية وشروط الاستخدام - فِهرِس</title>
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .privacy-container {
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .privacy-navbar {
+            position: sticky;
+            top: 16px;
+            z-index: 50;
+            height: 68px;
+            flex-wrap: nowrap;
+        }
+        .back-pill-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 40px;
+            padding: 0 16px;
+            border-radius: 13px;
+            background: rgba(14, 165, 233, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: var(--primary-light);
+            font-family: 'Tajawal', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-snappy);
+            white-space: nowrap;
+        }
+        .back-pill-btn i {
+            transition: transform 0.2s ease;
+        }
+        .back-pill-btn:hover {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: #ffffff;
+            border-color: transparent;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+        }
+        .back-pill-btn:hover i {
+            transform: translateX(3px);
+        }
+        .policy-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+        .policy-card h2 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary-light);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .policy-card p, .policy-card li {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 8px;
+        }
+        .policy-card ul {
+            padding-right: 22px;
+            margin-top: 8px;
+        }
+        .policy-card a {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .policy-card a:hover {
+            text-decoration: underline;
+        }
+        .en-block {
+            direction: ltr;
+            text-align: left;
+            border-top: 1px dashed var(--border-highlight);
+            padding-top: 20px;
+            margin-top: 10px;
+        }
+        .en-block ul {
+            padding-right: 0;
+            padding-left: 22px;
+        }
+        .license-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(20, 184, 166, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(20, 184, 166, 0.3);
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        @media (max-width: 768px) {
+            .privacy-navbar {
+                height: 58px;
+                padding: 0 12px;
+                top: 8px;
+            }
+            .license-badge {
+                display: none;
+            }
+            .back-pill-btn {
+                height: 36px;
+                padding: 0 12px;
+                font-size: 0.84rem;
+            }
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="app-container" style="flex-direction: column;">
+        <div class="privacy-container">
+            <!-- شريط علوي متناسق مع هوية فهرس -->
+            <header class="navbar privacy-navbar">
+                <div class="navbar-left" style="gap: 12px;">
+                    <a href="index.html" onclick="goBackToApp(event)" class="back-pill-btn" title="العودة إلى فِهرِس">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>فِهرِس</span>
+                    </a>
+                    <h1 class="page-title" style="font-size: 1.15rem;">سياسة الخصوصية</h1>
+                </div>
+                <div class="navbar-right" style="display: flex; align-items: center; gap: 10px;">
+                    <span class="license-badge"><i class="fas fa-code-branch"></i> مفتوح المصدر • غير تجاري</span>
+                    <button class="nav-btn" onclick="togglePrivacyTheme()" title="تبديل المظهر">
+                        <i class="fas fa-sun" id="privacyThemeIcon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- القسم العربي -->
+            <div class="policy-card">
+                <h2><i class="fas fa-shield-alt"></i> 1. نظرة عامة وطبيعة المشروع</h2>
+                <p>تطبيق <strong>فِهرِس</strong> هو أداة ويب مجانية ومفتوحة المصدر لإدارة وتنظيم الروابط والمفضلات، تم تطويرها وتصميمها بواسطة <strong>فاضل الشامي</strong>، وهي متاحة للجميع للاستخدام الشخصي والتعليمي غير التجاري فقط.</p>
+            </div>
+
+            <div class="policy-card">
+                <h2><i class="fas fa-database"></i> 2. آلية تخزين البيانات والمزامنة السحابية</h2>
+                <p>يعمل تطبيق <strong>فِهرِس</strong> بالكامل من جانب المتصفح (Client-Side) ولا يمتلك أي خوادم خارجية لجمع أو تخزين بيانات المستخدمين:</p>
+                <ul>
+                    <li><strong>التخزين المحلي (Local Storage):</strong> تُحفظ روابطك وتصنيفاتك وإعداداتك محلياً في متصفحك لتعمل بسرعة وبدون إنترنت.</li>
+                    <li><strong>التكامل مع Google Drive:</strong> عند اختيارك تسجيل الدخول بحساب Google، يطلب التطبيق صلاحية <code>drive.appdata</code> المحدودة فقط، وذلك لإنشاء وتحديث ملف النسخ الاحتياطي الخاص بالتطبيق (<code>fahras_backup.json</code>) داخل مجلد بيانات التطبيقات المخفي في حسابك الشخصي على Google Drive. لا يستطيع التطبيق الوصول إلى أي ملفات أو مجلدات أخرى في حسابك.</li>
+                    <li><strong>بيانات الملف الشخصي:</strong> تُستخدم الاسم والصورة الشخصية والبريد الإلكتروني لعرض حالة الحساب داخل واجهة التطبيق فقط، وتُخزّن محلياً في متصفحك.</li>
+                    <li><strong>الخصوصية التامة:</strong> لا يتم بيع أو مشاركة أو إرسال أي بيانات إلى أي طرف ثالث تحت أي ظرف.</li>
+                </ul>
+            </div>
+
+            <div class="policy-card">
+                <h2><i class="fab fa-google"></i> 3. الامتثال لسياسة بيانات مستخدمي Google API</h2>
+                <p>يلتزم استخدام تطبيق <strong>فِهرِس</strong> ونقله للمعلومات المستلمة من واجهات برمجة تطبيقات Google التزاماً كاملاً بـ <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">سياسة بيانات مستخدمي خدمات Google API</a>، بما في ذلك متطلبات الاستخدام المحدود (Limited Use).</p>
+            </div>
+
+            <div class="policy-card">
+                <h2><i class="fas fa-balance-scale"></i> 4. الملكية الفكرية وشروط الاستخدام غير التجاري</h2>
+                <p>جميع حقوق التصميم والبرمجة محفوظة للمطور <strong>فاضل الشامي © 2026</strong>. يُنشر الكود المصدري على GitHub بترخيص مفتوح المصدر للاستخدام الشخصي والتعليمي المجاني فقط، ويُمنع منعاً باتاً إعادة بيع التطبيق أو استغلاله تجارياً بأي صورة دون إذن خطي مسبق من المطور.</p>
+            </div>
+
+            <!-- القسم الإنجليزي -->
+            <div class="policy-card en-block">
+                <h2><i class="fas fa-globe"></i> Privacy Policy &amp; Terms of Use (English)</h2>
+                <p><strong>Fihris (فِهرِس)</strong> is a free, open-source, non-commercial bookmark and link management web application developed by <strong>Fadel Al-Shami</strong> and hosted on GitHub Pages.</p>
+                <ul>
+                    <li><strong>Client-Side Architecture:</strong> Fihris operates 100% client-side in your browser and does not own or operate any backend servers to collect, store, or analyze user data.</li>
+                    <li><strong>Google Drive AppData Scope:</strong> When you optionally sign in with Google, Fihris requests only the restricted <code>https://www.googleapis.com/auth/drive.appdata</code> scope to read and write its own hidden backup file (<code>fahras_backup.json</code>) in your personal Google Drive. It cannot access any other files in your Drive.</li>
+                    <li><strong>Zero Third-Party Sharing:</strong> We never sell, rent, or transmit your personal information or Google account data to any third party.</li>
+                    <li><strong>Google API Compliance:</strong> Fihris's use and transfer to any other app of information received from Google APIs adheres strictly to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
+                    <li><strong>Non-Commercial Open Source License:</strong> Source code is publicly available on GitHub for personal and educational use only. Commercial use, redistribution for profit, or rebranding without prior written permission is strictly prohibited.</li>
+                </ul>
+            </div>
+
+            <footer class="app-footer">
+                <div class="footer-rights">
+                    <i class="fas fa-code" style="color:var(--primary-light);"></i>
+                    <span>جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong></span>
+                </div>
+                <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill">
+                    <i class="fab fa-whatsapp"></i>
+                    <span class="wa-number">+963 944 650 364</span>
+                </a>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const savedTheme = localStorage.getItem('linkvault_theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+        document.getElementById('privacyThemeIcon').className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+
+        function togglePrivacyTheme() {
+            const current = document.body.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem('linkvault_theme', next);
+            document.getElementById('privacyThemeIcon').className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        function goBackToApp(e) {
+            if (document.referrer && document.referrer.includes(window.location.host)) {
+                e.preventDefault();
+                window.history.back();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -398,52 +398,6 @@
         <i class="fas fa-plus"></i>
     </button>
 
-    <!-- Privacy & Welcome Modal (نافذة منبثقة لسياسة الخصوصية والتعريف) -->
-    <div class="modal-overlay" id="privacyWelcomeModal">
-        <div class="modal privacy-welcome-modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-shield-alt"></i> مرحباً بك في فِهرِس - Fihris</h2>
-                <button class="modal-close" onclick="closePrivacyModal()" aria-label="إغلاق"><i
-                        class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <div class="privacy-modal-intro">
-                    <p>
-                        <strong>فِهرِس (Fihris)</strong> هو تطبيق ويب مجاني ومفتوح المصدر لإدارة وتنظيم روابطك المفضلة
-                        محلياً في متصفحك، مع إمكانية المزامنة السحابية الآمنة لنسختك الاحتياطية عبر <strong>Google
-                            Drive</strong> دون جمع أو مشاركة أي بيانات شخصية مع أي طرف ثالث.
-                    </p>
-                    <p dir="ltr" class="en-note">
-                        <strong>Fihris</strong> is a free, open-source personal bookmark manager with optional Google
-                        Drive backup sync (<code>drive.appdata</code>). Your data stays private in your browser and
-                        personal Drive.
-                    </p>
-                </div>
-
-                <div class="privacy-modal-links">
-                    <a href="privacy.html" class="btn btn-secondary"
-                        style="text-decoration:none;width:100%;justify-content:center;">
-                        <i class="fas fa-file-contract"></i> قراءة سياسة الخصوصية وشروط الاستخدام كاملة
-                    </a>
-                </div>
-
-                <label class="dont-show-label" for="dontShowPrivacyAgain">
-                    <input type="checkbox" id="dontShowPrivacyAgain">
-                    <span>عدم العرض مرة أخرى</span>
-                </label>
-            </div>
-            <div class="modal-footer" style="justify-content: space-between;">
-                <button type="button" class="btn btn-primary" onclick="closePrivacyModal()">
-                    <i class="fas fa-check"></i> موافق ومتابعة
-                </button>
-                <a href="privacy.html"
-                    style="font-size:0.84rem;color:var(--primary-light);text-decoration:none;font-weight:700;">
-                    Privacy Policy &rarr;
-                </a>
-            </div>
-        </div>
-    </div>
-
     <!-- Add/Edit Link Modal -->
     <div class="modal-overlay" id="linkModal">
         <div class="modal">

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>فِهرِس - بوابتك الذكية للروابط</title>
+    <title>فِهرِس - Fihris | بوابتك الذكية لإدارة الروابط</title>
     <!-- الصق هنا وسم التحقق من Google Search Console -->
     <meta name="google-site-verification" content="73JI0VJVTGlMa7BHLaEu9zySI0MJlci9jPKTl4jORrE" />
     <!-- 1. أيقونات المتصفح -->
@@ -16,13 +17,16 @@
     <link rel="manifest" href="favicon/site.webmanifest" />
     <!-- 4. لون شريط المتصفح -->
     <meta name="theme-color" content="#0088cc">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://www.google.com; img-src 'self' data: https://www.google.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://icons.duckduckgo.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'none'; form-action 'self';">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://www.google.com; img-src 'self' data: https://www.google.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://icons.duckduckgo.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'none'; form-action 'self';">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body data-theme="dark">
 
     <!-- طبقة التعتيم الخلفية للقائمة الجانبية في الهواتف -->
@@ -74,7 +78,8 @@
         <main class="main-content">
             <header class="navbar">
                 <div class="navbar-left">
-                    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="فتح القائمة"><i class="fas fa-bars"></i></button>
+                    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="فتح القائمة"><i
+                            class="fas fa-bars"></i></button>
                     <h1 class="page-title" id="pageTitle">فِهرِس الروابط</h1>
                 </div>
                 <div class="navbar-right">
@@ -82,21 +87,46 @@
                         <i class="fas fa-search"></i>
                         <input type="text" id="searchInput" placeholder="ابحث في فهرسك...">
                     </div>
-                    <button class="google-nav-btn" id="navGoogleBtn" onclick="handleNavbarGoogleClick()" title="المزامنة السحابية عبر Google">
+                    <button class="google-nav-btn" id="navGoogleBtn" onclick="handleNavbarGoogleClick()"
+                        title="المزامنة السحابية عبر Google">
                         <i class="fab fa-google"></i>
                         <span id="navGoogleText">دخول</span>
                     </button>
-                    <button class="nav-btn" onclick="toggleTheme()" title="تبديل المظهر"><i class="fas fa-sun" id="navbarThemeIcon"></i></button>
+                    <button class="nav-btn" onclick="toggleTheme()" title="تبديل المظهر"><i class="fas fa-sun"
+                            id="navbarThemeIcon"></i></button>
                 </div>
             </header>
 
             <div class="content-area">
+                <div class="policy-welcome-banner" id="appIntroBanner"
+                    style="background:var(--bg-surface);border:1px solid var(--border-highlight);border-radius:18px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;box-shadow:var(--shadow);">
+                    <div style="flex:1;min-width:240px;">
+                        <h2 style="font-size:1.05rem;font-weight:800;color:var(--primary-light);margin-bottom:4px;">
+                            <i class="fas fa-compass"></i> فِهرِس (Fihris) — بوابتك الذكية لإدارة وتنظيم الروابط
+                        </h2>
+                        <p style="font-size:0.86rem;color:var(--text-secondary);line-height:1.6;margin:0;">
+                            أداة ويب مجانية ومفتوحة المصدر لحفظ وتصنيف مواقعك المفضلة محلياً، مع خيار المزامنة السحابية
+                            الآمنة لنسختك الاحتياطية عبر Google Drive.
+                            <br>
+                            <span dir="ltr"
+                                style="display:inline-block;font-size:0.8rem;color:var(--text-muted);margin-top:3px;">
+                                <strong>Fihris</strong> is a free, open-source personal bookmark manager with optional
+                                Google Drive backup sync.
+                            </span>
+                        </p>
+                    </div>
+                    <a href="privacy.html" class="btn btn-secondary"
+                        style="text-decoration:none;font-size:0.82rem;padding:7px 14px;">
+                        <i class="fas fa-shield-alt"></i> سياسة الخصوصية / Privacy
+                    </a>
+                </div>
                 <!-- واجهة الروابط الموحدة -->
                 <div class="view-section active" id="dashboardView">
                     <div class="pinned-favorites-wrapper" id="pinnedFavoritesSection" style="display:none;">
                         <div class="pinned-header">
                             <div class="pinned-title"><i class="fas fa-heart"></i> الوصول السريع (المفضلة)</div>
-                            <span style="font-size:0.76rem;color:var(--text-muted);" id="pinnedCountLabel">0 روابط</span>
+                            <span style="font-size:0.76rem;color:var(--text-muted);" id="pinnedCountLabel">0
+                                روابط</span>
                         </div>
                         <div class="pinned-strip" id="pinnedFavoritesStrip"></div>
                     </div>
@@ -112,7 +142,8 @@
                                     <i class="fas fa-fire"></i> الأكثر زيارة
                                 </button>
                             </div>
-                            <button class="btn btn-primary desktop-add-btn" onclick="openModal()"><i class="fas fa-plus"></i> إضافة رابط</button>
+                            <button class="btn btn-primary desktop-add-btn" onclick="openModal()"><i
+                                    class="fas fa-plus"></i> إضافة رابط</button>
                         </div>
                     </div>
 
@@ -124,7 +155,8 @@
                 <div class="view-section" id="categoriesView">
                     <div class="section-header">
                         <h2><i class="fas fa-folder"></i> التصنيفات</h2>
-                        <button class="btn btn-primary" onclick="openCategoryModal()"><i class="fas fa-plus"></i> تصنيف جديد</button>
+                        <button class="btn btn-primary" onclick="openCategoryModal()"><i class="fas fa-plus"></i> تصنيف
+                            جديد</button>
                     </div>
                     <div class="categories-grid" id="categoriesGrid"></div>
                 </div>
@@ -133,7 +165,9 @@
                 <div class="view-section" id="categoryDetailView">
                     <div class="section-header">
                         <h2 id="categoryDetailTitle"><i class="fas fa-folder"></i> </h2>
-                        <button class="btn btn-secondary" onclick="showView('categories', document.querySelector('a[onclick*=categories]'))"><i class="fas fa-arrow-right"></i> العودة للتصنيفات</button>
+                        <button class="btn btn-secondary"
+                            onclick="showView('categories', document.querySelector('a[onclick*=categories]'))"><i
+                                class="fas fa-arrow-right"></i> العودة للتصنيفات</button>
                     </div>
                     <div class="cards-grid" id="categoryDetailCards"></div>
                 </div>
@@ -142,26 +176,32 @@
                 <div class="view-section" id="statisticsView">
                     <div class="section-header">
                         <h2><i class="fas fa-chart-pie"></i> ملخص الاستخدام</h2>
-                        <button class="btn btn-secondary" onclick="renderCharts()"><i class="fas fa-sync-alt"></i> تحديث</button>
+                        <button class="btn btn-secondary" onclick="renderCharts()"><i class="fas fa-sync-alt"></i>
+                            تحديث</button>
                     </div>
 
                     <div class="stats-dashboard">
                         <div class="stat-box">
-                            <div class="stat-box-icon" style="background:rgba(14,165,233,0.15);color:var(--primary-light);"><i class="fas fa-link"></i></div>
+                            <div class="stat-box-icon"
+                                style="background:rgba(14,165,233,0.15);color:var(--primary-light);"><i
+                                    class="fas fa-link"></i></div>
                             <div class="stat-box-info">
                                 <div class="stat-box-value" id="statBoxTotal">0</div>
                                 <div class="stat-box-label">إجمالي الروابط</div>
                             </div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-box-icon" style="background:rgba(245,158,11,0.15);color:var(--warning);"><i class="fas fa-fire"></i></div>
+                            <div class="stat-box-icon" style="background:rgba(245,158,11,0.15);color:var(--warning);"><i
+                                    class="fas fa-fire"></i></div>
                             <div class="stat-box-info">
                                 <div class="stat-box-value" id="statBoxClicks">0</div>
                                 <div class="stat-box-label">إجمالي الزيارات</div>
                             </div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-box-icon" style="background:rgba(244,63,94,0.15);color:var(--secondary);"><i class="fas fa-heart"></i></div>
+                            <div class="stat-box-icon" style="background:rgba(244,63,94,0.15);color:var(--secondary);">
+                                <i class="fas fa-heart"></i>
+                            </div>
                             <div class="stat-box-info">
                                 <div class="stat-box-value" id="statBoxFavorites">0</div>
                                 <div class="stat-box-label">المفضلة</div>
@@ -183,7 +223,9 @@
 
                 <!-- واجهة الإعدادات -->
                 <div class="view-section" id="settingsView">
-                    <div class="section-header"><h2><i class="fas fa-cog"></i> الإعدادات</h2></div>
+                    <div class="section-header">
+                        <h2><i class="fas fa-cog"></i> الإعدادات</h2>
+                    </div>
 
                     <!-- قسم الحساب السحابي والمزامنة -->
                     <div class="settings-section">
@@ -193,7 +235,8 @@
                         <div id="googleLoggedOutBox" class="setting-item">
                             <div class="setting-info">
                                 <h4>ربط حساب Google</h4>
-                                <p>سجّل الدخول لحفظ نسخة احتياطية تلقائية من روابطك على Google Drive واستعادتها من أي جهاز</p>
+                                <p>سجّل الدخول لحفظ نسخة احتياطية تلقائية من روابطك على Google Drive واستعادتها من أي
+                                    جهاز</p>
                             </div>
                             <button type="button" class="btn btn-google" onclick="signInWithGoogle()">
                                 <i class="fab fa-google"></i> تسجيل الدخول عبر Google
@@ -207,7 +250,8 @@
                                 <div class="google-profile-info">
                                     <h4 id="googleUserName">اسم المستخدم</h4>
                                     <p id="googleUserEmail">user@gmail.com</p>
-                                    <span class="sync-badge" id="lastSyncLabel"><i class="fas fa-cloud-check"></i> متصل بـ Google Drive</span>
+                                    <span class="sync-badge" id="lastSyncLabel"><i class="fas fa-cloud-check"></i> متصل
+                                        بـ Google Drive</span>
                                 </div>
                             </div>
 
@@ -231,7 +275,8 @@
                                     <h4>توقيت المزامنة التلقائية</h4>
                                     <p>اختر متى يتم رفع التغييرات تلقائياً إلى Google Drive</p>
                                 </div>
-                                <select id="syncFrequencySelect" class="sync-select" onchange="changeSyncFrequency(this.value)">
+                                <select id="syncFrequencySelect" class="sync-select"
+                                    onchange="changeSyncFrequency(this.value)">
                                     <option value="instant">فوري (عند كل إضافة أو تعديل)</option>
                                     <option value="daily">تلقائي كل 24 ساعة</option>
                                     <option value="manual">يدوي فقط</option>
@@ -263,16 +308,28 @@
                     <div class="settings-section">
                         <h3><i class="fas fa-palette"></i> المظهر</h3>
                         <div class="setting-item">
-                            <div class="setting-info"><h4>الوضع الداكن</h4><p id="themeDesc">التطبيق يستخدم الوضع الداكن حالياً</p></div>
-                            <label class="toggle"><input type="checkbox" id="themeToggle" checked onchange="toggleTheme()"><span class="toggle-slider"></span></label>
+                            <div class="setting-info">
+                                <h4>الوضع الداكن</h4>
+                                <p id="themeDesc">التطبيق يستخدم الوضع الداكن حالياً</p>
+                            </div>
+                            <label class="toggle"><input type="checkbox" id="themeToggle" checked
+                                    onchange="toggleTheme()"><span class="toggle-slider"></span></label>
                         </div>
                     </div>
 
                     <div class="settings-section">
                         <h3><i class="fas fa-database"></i> البيانات والنسخ الاحتياطي</h3>
                         <div class="setting-item" style="flex-direction:column;align-items:stretch;gap:14px;">
-                            <div class="import-export-area" onclick="exportData()"><i class="fas fa-download"></i><h4>تصدير البيانات</h4><p>حفظ نسخة احتياطية من جميع روابطك وتصنيفاتك</p></div>
-                            <div class="import-export-area" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i><h4>استيراد البيانات</h4><p>استعادة البيانات من ملف JSON (تضاف إلى الموجودة)</p><input type="file" id="importFile" accept=".json" style="display:none;" onchange="handleImport(event)"></div>
+                            <div class="import-export-area" onclick="exportData()"><i class="fas fa-download"></i>
+                                <h4>تصدير البيانات</h4>
+                                <p>حفظ نسخة احتياطية من جميع روابطك وتصنيفاتك</p>
+                            </div>
+                            <div class="import-export-area" onclick="document.getElementById('importFile').click()"><i
+                                    class="fas fa-upload"></i>
+                                <h4>استيراد البيانات</h4>
+                                <p>استعادة البيانات من ملف JSON (تضاف إلى الموجودة)</p><input type="file"
+                                    id="importFile" accept=".json" style="display:none;" onchange="handleImport(event)">
+                            </div>
                         </div>
                     </div>
 
@@ -284,7 +341,8 @@
                                 <p>مشروع مفتوح المصدر للاستخدام غير التجاري © 2026</p>
                             </div>
                             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                <a href="privacy.html" class="btn btn-secondary" style="text-decoration:none;padding:7px 14px;font-size:0.84rem;">
+                                <a href="privacy.html" class="btn btn-secondary"
+                                    style="text-decoration:none;padding:7px 14px;font-size:0.84rem;">
                                     <i class="fas fa-shield-alt"></i> سياسة الخصوصية
                                 </a>
                                 <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill">
@@ -298,8 +356,12 @@
                     <div class="settings-section">
                         <h3><i class="fas fa-trash"></i> إدارة البيانات</h3>
                         <div class="setting-item">
-                            <div class="setting-info"><h4>حذف جميع البيانات</h4><p>حذف جميع الروابط والتصنيفات نهائياً</p></div>
-                            <button type="button" class="btn btn-danger" onclick="clearAllData()"><i class="fas fa-trash"></i> حذف الكل</button>
+                            <div class="setting-info">
+                                <h4>حذف جميع البيانات</h4>
+                                <p>حذف جميع الروابط والتصنيفات نهائياً</p>
+                            </div>
+                            <button type="button" class="btn btn-danger" onclick="clearAllData()"><i
+                                    class="fas fa-trash"></i> حذف الكل</button>
                         </div>
                     </div>
                 </div>
@@ -309,8 +371,11 @@
             <footer class="app-footer">
                 <div class="footer-rights">
                     <i class="fas fa-code" style="color:var(--primary-light);"></i>
-                    <span class="desktop-rights">جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم: <strong>فاضل الشامي</strong> • <a href="privacy.html" style="color:var(--primary-light);text-decoration:none;">سياسة الخصوصية</a></span>
-                    <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <a href="privacy.html" style="color:var(--primary-light);text-decoration:none;">الخصوصية</a></span>
+                    <span class="desktop-rights">جميع الحقوق محفوظة لـ <strong>فِهرِس</strong> © 2026 | تطوير وتصميم:
+                        <strong>فاضل الشامي</strong> • <a href="privacy.html"
+                            style="color:var(--primary-light);text-decoration:none;">سياسة الخصوصية</a></span>
+                    <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <a href="privacy.html"
+                            style="color:var(--primary-light);text-decoration:none;">الخصوصية</a></span>
                 </div>
                 <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill" title="راسلني عبر واتساب">
                     <i class="fab fa-whatsapp"></i>
@@ -328,16 +393,27 @@
     <!-- Add/Edit Link Modal -->
     <div class="modal-overlay" id="linkModal">
         <div class="modal">
-            <div class="modal-header"><h2><i class="fas fa-plus-circle"></i> إضافة رابط جديد</h2><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> إضافة رابط جديد</h2><button class="modal-close"
+                    onclick="closeModal()"><i class="fas fa-times"></i></button>
+            </div>
             <form id="linkForm" onsubmit="saveLink(event)">
                 <div class="modal-body">
-                    <div class="form-group"><label>اسم الموقع</label><input type="text" id="siteName" placeholder="مثال: GitHub" required></div>
-                    <div class="form-group"><label>رابط الموقع</label><input type="url" id="siteUrl" placeholder="https://www.example.com" required></div>
+                    <div class="form-group"><label>اسم الموقع</label><input type="text" id="siteName"
+                            placeholder="مثال: GitHub" required></div>
+                    <div class="form-group"><label>رابط الموقع</label><input type="url" id="siteUrl"
+                            placeholder="https://www.example.com" required></div>
                     <div class="form-row">
-                        <div class="form-group"><label>التصنيف</label><select id="siteCategory"><option value="">بدون تصنيف</option></select></div>
-                        <div class="form-group"><label>المفضلة</label><select id="siteFavorite"><option value="false">لا</option><option value="true">نعم</option></select></div>
+                        <div class="form-group"><label>التصنيف</label><select id="siteCategory">
+                                <option value="">بدون تصنيف</option>
+                            </select></div>
+                        <div class="form-group"><label>المفضلة</label><select id="siteFavorite">
+                                <option value="false">لا</option>
+                                <option value="true">نعم</option>
+                            </select></div>
                     </div>
-                    <div class="form-group"><label>وصف (اختياري)</label><textarea id="siteDesc" placeholder="وصف مختصر للموقع..."></textarea></div>
+                    <div class="form-group"><label>وصف (اختياري)</label><textarea id="siteDesc"
+                            placeholder="وصف مختصر للموقع..."></textarea></div>
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
@@ -350,27 +426,42 @@
     <!-- Category Modal -->
     <div class="modal-overlay" id="categoryModal">
         <div class="modal">
-            <div class="modal-header"><h2 id="categoryModalTitle"><i class="fas fa-folder-plus"></i> تصنيف جديد</h2><button class="modal-close" onclick="closeCategoryModal()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-header">
+                <h2 id="categoryModalTitle"><i class="fas fa-folder-plus"></i> تصنيف جديد</h2><button
+                    class="modal-close" onclick="closeCategoryModal()"><i class="fas fa-times"></i></button>
+            </div>
             <form id="categoryForm" onsubmit="saveCategory(event)">
                 <div class="modal-body">
                     <input type="hidden" id="editingCategoryId" value="">
-                    <div class="form-group"><label>اسم التصنيف</label><input type="text" id="categoryName" placeholder="مثال: تعليم" required></div>
-                    <div class="form-group"><label>الأيقونة</label><input type="text" id="categoryIcon" placeholder="fas fa-graduation-cap" value="fas fa-folder"><small style="color:var(--text-muted);font-size:0.75rem;">استخدم أيقونات Font Awesome</small></div>
+                    <div class="form-group"><label>اسم التصنيف</label><input type="text" id="categoryName"
+                            placeholder="مثال: تعليم" required></div>
+                    <div class="form-group"><label>الأيقونة</label><input type="text" id="categoryIcon"
+                            placeholder="fas fa-graduation-cap" value="fas fa-folder"><small
+                            style="color:var(--text-muted);font-size:0.75rem;">استخدم أيقونات Font Awesome</small></div>
                     <div class="form-group"><label>اللون</label>
                         <div class="color-options" id="colorOptions">
-                            <div class="color-option selected" style="background:#0ea5e9;" data-color="#0ea5e9" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#14b8a6;" data-color="#14b8a6" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#f43f5e;" data-color="#f43f5e" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#10b981;" data-color="#10b981" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#f59e0b;" data-color="#f59e0b" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#6366f1;" data-color="#6366f1" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#8b5cf6;" data-color="#8b5cf6" onclick="selectColor(this)"></div>
-                            <div class="color-option" style="background:#ef4444;" data-color="#ef4444" onclick="selectColor(this)"></div>
+                            <div class="color-option selected" style="background:#0ea5e9;" data-color="#0ea5e9"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#14b8a6;" data-color="#14b8a6"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#f43f5e;" data-color="#f43f5e"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#10b981;" data-color="#10b981"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#f59e0b;" data-color="#f59e0b"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#6366f1;" data-color="#6366f1"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#8b5cf6;" data-color="#8b5cf6"
+                                onclick="selectColor(this)"></div>
+                            <div class="color-option" style="background:#ef4444;" data-color="#ef4444"
+                                onclick="selectColor(this)"></div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary" id="categorySubmitBtn"><i class="fas fa-save"></i> إنشاء</button>
+                    <button type="submit" class="btn btn-primary" id="categorySubmitBtn"><i class="fas fa-save"></i>
+                        إنشاء</button>
                     <button type="button" class="btn btn-secondary" onclick="closeCategoryModal()">إلغاء</button>
                 </div>
             </form>
@@ -398,4 +489,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>

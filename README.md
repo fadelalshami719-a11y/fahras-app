@@ -35,5 +35,5 @@
 
 ## Overview (English — For Google OAuth Verification)
 **Fihris (فِهرِس)** is a free, open-source, non-commercial bookmark manager hosted on GitHub Pages. It operates strictly client-side and optionally uses the restricted `drive.appdata` scope to sync a personal JSON backup file (`fahras_backup.json`) in the user's own Google Drive.
-- **Home Page:** `https://USERNAME.github.io/fihris/`
-- **Privacy Policy:** `https://USERNAME.github.io/fihris/privacy.html`
+- **Home Page:** `https://fadelalshami719-a11y.github.io/fahras-app/`
+- **Privacy Policy:** `https://fadelalshami719-a11y.github.io/fahras-app/privacy.html`

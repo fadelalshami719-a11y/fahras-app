@@ -119,24 +119,6 @@ let currentFilter = 'all';
 let currentSort = 'recent';
 let currentCategoryDetailId = null;
 
-// ===== إدارة نافذة سياسة الخصوصية والترحيب المنبثقة =====
-function initPrivacyModal() {
-    const isDismissed = localStorage.getItem('fahras_hide_privacy_modal') === 'true';
-    if (!isDismissed) {
-        const modal = document.getElementById('privacyWelcomeModal');
-        if (modal) modal.classList.add('active');
-    }
-}
-
-function closePrivacyModal() {
-    const checkbox = document.getElementById('dontShowPrivacyAgain');
-    if (checkbox && checkbox.checked) {
-        localStorage.setItem('fahras_hide_privacy_modal', 'true');
-    }
-    const modal = document.getElementById('privacyWelcomeModal');
-    if (modal) modal.classList.remove('active');
-}
-
 // ===== تهيئة عميل مصادقة جوجل =====
 /*
  * ⚠️ ملاحظة أمنية:
@@ -685,7 +667,6 @@ function updateThemeUI(theme) {
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
-    initPrivacyModal(); // إظهار نافذة سياسة الخصوصية إذا لم يتم اختيار "عدم العرض مرة أخرى"
     updateGoogleUI(); // يعرض المستخدم كـ"متصل" فوراً من localStorage إذا كان مسجلاً
     initGoogleAuth();
     updateCategorySelect();
@@ -1638,10 +1619,6 @@ function renderCharts() {
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
-            if (overlay.id === 'privacyWelcomeModal') {
-                closePrivacyModal();
-                return;
-            }
             overlay.classList.remove('active');
             if (overlay.id === 'confirmModal') confirmCallback = null;
         }
@@ -1650,9 +1627,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (document.getElementById('privacyWelcomeModal')?.classList.contains('active')) {
-            closePrivacyModal();
-        }
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
         document.getElementById('sidebar')?.classList.remove('active');
         document.getElementById('sidebarOverlay')?.classList.remove('active');

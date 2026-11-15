@@ -4,8 +4,8 @@
   <p>تطبيق ويب سريع، مجاني، ومفتوح المصدر لإدارة وتنظيم الروابط والمفضلات مع مزامنة سحابية آمنة عبر Google Drive.</p>
 
   <p>
-    <a href="https://fadelalshami719-a11y.github.io/fihris/"><strong>🌐 تجربة التطبيق مباشرة (Live Demo)</strong></a> •
-    <a href="https://fadelalshami719-a11y.github.io/fihris/privacy.html"><strong>🛡️ سياسة الخصوصية (Privacy Policy)</strong></a>
+    <a href="https://fadelalshami719-a11y.github.io/fahras-app/"><strong>🌐 تجربة التطبيق مباشرة (Live Demo)</strong></a> •
+    <a href="https://fadelalshami719-a11y.github.io/fahras-app//privacy.html"><strong>🛡️ سياسة الخصوصية (Privacy Policy)</strong></a>
   </p>
 </div>
 

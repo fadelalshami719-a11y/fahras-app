@@ -97,6 +97,28 @@
             </header>
 
             <div class="content-area">
+                <div id="crawlerVisibleIntro" style="background:var(--bg-surface);border:1px solid var(--border-highlight);border-radius:16px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:220px;">
+        <h2 style="font-size:1rem;font-weight:800;color:var(--primary-light);margin-bottom:4px;">
+            فِهرِس - Fihris | Smart Personal Bookmark Manager
+        </h2>
+        <p style="font-size:0.84rem;color:var(--text-secondary);line-height:1.5;margin:0;">
+            <strong>فِهرِس - Fihris</strong> هو تطبيق ويب مجاني لحفظ وتنظيم الروابط محلياً مع خيار النسخ الاحتياطي الآمن عبر Google Drive (<code>drive.appdata</code>). لا يتطلب التطبيق إنشاء حساب أو تسجيل دخول لاستخدامه.
+            <br>
+            <span dir="ltr" style="display:inline-block;font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+                <strong>Fihris (فِهرِس)</strong> is a free, open-source bookmark manager. No login is required to use the app; optional Google Drive sync is used solely for personal backup.
+            </span>
+        </p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+        <a href="privacy.html" class="btn btn-secondary" style="text-decoration:none;font-size:0.8rem;padding:6px 12px;">
+            سياسة الخصوصية / Privacy Policy
+        </a>
+        <button type="button" onclick="this.closest('#crawlerVisibleIntro').style.display='none'" class="nav-btn" title="إخفاء" style="width:32px;height:32px;">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
                 <!-- واجهة الروابط الموحدة -->
                 <div class="view-section active" id="dashboardView">
                     <div class="pinned-favorites-wrapper" id="pinnedFavoritesSection" style="display:none;">

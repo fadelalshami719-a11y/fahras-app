@@ -2,11 +2,20 @@
 const GOOGLE_CLIENT_ID = '674857553188-s9tu07obk7eods4ffh8ds8aekuavjfiq.apps.googleusercontent.com';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const DRIVE_BACKUP_FILENAME = 'fahras_backup.json';
+const DEFAULT_CATEGORIES = Object.freeze([
+    { id: 'general', name: 'عام', icon: 'fas fa-globe', color: '#0ea5e9', updatedAt: 1 },
+    { id: 'dev', name: 'تطوير', icon: 'fas fa-code', color: '#10b981', updatedAt: 1 },
+    { id: 'design', name: 'تصميم', icon: 'fas fa-paint-brush', color: '#f43f5e', updatedAt: 1 },
+    { id: 'edu', name: 'تعليم', icon: 'fas fa-graduation-cap', color: '#14b8a6', updatedAt: 1 },
+    { id: 'news', name: 'أخبار', icon: 'fas fa-newspaper', color: '#f59e0b', updatedAt: 1 }
+]);
+const MAX_LOCAL_SESSION_MS = 60 * 60 * 1000; // 60 دقيقة كحد أقصى للجلسة المحلية
 
 let tokenClient = null;
-let googleAccessToken = localStorage.getItem('fahras_google_token') || null;
-let googleTokenExpiry = Number(localStorage.getItem('fahras_google_expiry') || 0);
+let googleAccessToken = sessionStorage.getItem('fahras_google_token') || null;
+let googleTokenExpiry = Number(sessionStorage.getItem('fahras_google_expiry') || 0);
 let googleUserProfile = JSON.parse(localStorage.getItem('fahras_google_user') || 'null');
+let needsReconnect = false;
 let autoSyncTimeout = null;
 let liveSyncInterval = null;
 let lastKnownCloudModified = localStorage.getItem('fahras_cloud_mtime') || '';
@@ -33,6 +42,59 @@ function generateUniqueId() {
     return Date.now() + '_' + Math.random().toString(36).substr(2, 10);
 }
 
+// ===== دوال التحقق والتنظيف المركزية =====
+function isValidHexColor(color) {
+    return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
+function isValidFontAwesomeIcon(icon) {
+    return typeof icon === 'string'
+        && icon.length > 0
+        && icon.length <= 50
+        && /^(fas|far|fab|fal) fa-[a-z0-9-]+$/.test(icon);
+}
+
+function sanitizeColor(color, fallback = '#0ea5e9') {
+    return isValidHexColor(color) ? color.toLowerCase() : fallback;
+}
+
+function sanitizeIcon(icon, fallback = 'fas fa-folder') {
+    return isValidFontAwesomeIcon(icon) ? icon : fallback;
+}
+
+// ===== دوال إدارة جلسة التوكن والحماية =====
+function setTokenSession(accessToken, expiresInSeconds = 3500) {
+    const lifetimeMs = Math.min(Number(expiresInSeconds || 3500) * 1000, MAX_LOCAL_SESSION_MS);
+    googleAccessToken = accessToken;
+    googleTokenExpiry = Date.now() + lifetimeMs;
+    needsReconnect = false;
+    sessionStorage.setItem('fahras_google_token', googleAccessToken);
+    sessionStorage.setItem('fahras_google_expiry', String(googleTokenExpiry));
+    // إزالة أي بقايا قديمة للتوكن من localStorage
+    localStorage.removeItem('fahras_google_token');
+    localStorage.removeItem('fahras_google_expiry');
+}
+
+function clearTokenSession(clearProfile = false) {
+    googleAccessToken = null;
+    googleTokenExpiry = 0;
+    sessionStorage.removeItem('fahras_google_token');
+    sessionStorage.removeItem('fahras_google_expiry');
+    localStorage.removeItem('fahras_google_token');
+    localStorage.removeItem('fahras_google_expiry');
+
+    if (clearProfile) {
+        googleUserProfile = null;
+        needsReconnect = false;
+        localStorage.removeItem('fahras_google_user');
+    }
+}
+
+function isSessionExpired() {
+    if (!googleAccessToken || !googleTokenExpiry) return true;
+    return Date.now() >= (googleTokenExpiry - 60000);
+}
+
 let links = (() => {
     const stored = localStorage.getItem('linkvault_links');
     if (!stored) return [];
@@ -45,13 +107,8 @@ let links = (() => {
     });
 })();
 
-let categories = JSON.parse(localStorage.getItem('linkvault_categories')) || [
-    { id: 'general', name: 'عام', icon: 'fas fa-globe', color: '#0ea5e9', updatedAt: 1 },
-    { id: 'dev', name: 'تطوير', icon: 'fas fa-code', color: '#10b981', updatedAt: 1 },
-    { id: 'design', name: 'تصميم', icon: 'fas fa-paint-brush', color: '#f43f5e', updatedAt: 1 },
-    { id: 'edu', name: 'تعليم', icon: 'fas fa-graduation-cap', color: '#14b8a6', updatedAt: 1 },
-    { id: 'news', name: 'أخبار', icon: 'fas fa-newspaper', color: '#f59e0b', updatedAt: 1 }
-];
+let categories = JSON.parse(localStorage.getItem('linkvault_categories'))
+    || DEFAULT_CATEGORIES.map(c => ({ ...c }));
 
 let chartInstances = {};
 let editingId = null;
@@ -62,12 +119,50 @@ let currentFilter = 'all';
 let currentSort = 'recent';
 let currentCategoryDetailId = null;
 
+// ===== إدارة نافذة سياسة الخصوصية والترحيب المنبثقة =====
+function initPrivacyModal() {
+    const isDismissed = localStorage.getItem('fahras_hide_privacy_modal') === 'true';
+    if (!isDismissed) {
+        const modal = document.getElementById('privacyWelcomeModal');
+        if (modal) modal.classList.add('active');
+    }
+}
+
+function closePrivacyModal() {
+    const checkbox = document.getElementById('dontShowPrivacyAgain');
+    if (checkbox && checkbox.checked) {
+        localStorage.setItem('fahras_hide_privacy_modal', 'true');
+    }
+    const modal = document.getElementById('privacyWelcomeModal');
+    if (modal) modal.classList.remove('active');
+}
+
 // ===== تهيئة عميل مصادقة جوجل =====
+/*
+ * ⚠️ ملاحظة أمنية:
+ * هذا التطبيق يعمل بالكامل من جانب العميل ولا يملك backend، لذا
+ * لا يمكن استخدام Authorization Code Flow مع PKCE ولا httpOnly
+ * cookies — وهما الحل الجذري لتخزين Tokens بأمان.
+ *
+ * الحل الحالي (sessionStorage + تقصير الجلسة + إبطال عند الخروج)
+ * هو تخفيف للأثر وليس إغلاقاً نهائياً للثغرة. الثغرة الحقيقية
+ * مغلقة جزئياً فقط بشرط تطبيق CSP صارم (مهمة منفصلة) ومسح جميع
+ * الثغرات الأخرى (XSS، حقن السمات).
+ */
+let googleAuthInitAttempts = 0;
+const MAX_GOOGLE_AUTH_ATTEMPTS = 20;
+
 function initGoogleAuth() {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        googleAuthInitAttempts++;
+        if (googleAuthInitAttempts >= MAX_GOOGLE_AUTH_ATTEMPTS) {
+            console.warn('تعذر تحميل مكتبة Google بعد 20 محاولة');
+            return;
+        }
         setTimeout(initGoogleAuth, 500);
         return;
     }
+    googleAuthInitAttempts = 0;
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: GOOGLE_SCOPES,
@@ -76,25 +171,34 @@ function initGoogleAuth() {
                 showToast('تعذر إتمام تسجيل الدخول عبر Google', 'error');
                 return;
             }
-            googleAccessToken = tokenResponse.access_token;
-            googleTokenExpiry = Date.now() + ((tokenResponse.expires_in || 3500) * 1000);
-            localStorage.setItem('fahras_google_token', googleAccessToken);
-            localStorage.setItem('fahras_google_expiry', String(googleTokenExpiry));
-
+            setTokenSession(tokenResponse.access_token, tokenResponse.expires_in);
             await fetchGoogleUserProfile();
             updateGoogleUI();
             showToast('تم تسجيل الدخول بنجاح! جارٍ مزامنة بياناتك...', 'success');
             await syncWithDrive(true);
         }
     });
+
+    // عند فتح تبويب جديد والمستخدم ظاهر كـ"متصل"، نبدأ أول مزامنة لتجديد التوكن بصمت
+    if (googleUserProfile && isSessionExpired()) {
+        const dayMs = 24 * 60 * 60 * 1000;
+        if (syncSettings.frequency === 'instant' || (syncSettings.frequency === 'daily' && (Date.now() - syncSettings.lastDailySync) >= dayMs)) {
+            syncWithDrive(true);
+        }
+    }
 }
 
 function isGoogleTokenValid() {
-    return googleAccessToken && Date.now() < (googleTokenExpiry - 60000);
+    return !isSessionExpired();
 }
 
 async function ensureValidGoogleToken(interactive = false) {
     if (isGoogleTokenValid()) return true;
+
+    if (googleAccessToken) {
+        clearTokenSession(false);
+    }
+
     if (!tokenClient) initGoogleAuth();
     if (!tokenClient) return false;
 
@@ -103,13 +207,14 @@ async function ensureValidGoogleToken(interactive = false) {
         tokenClient.callback = async (resp) => {
             tokenClient.callback = originalCallback;
             if (resp.error || !resp.access_token) {
+                if (!interactive && googleUserProfile) {
+                    needsReconnect = true;
+                    updateGoogleUI();
+                }
                 resolve(false);
                 return;
             }
-            googleAccessToken = resp.access_token;
-            googleTokenExpiry = Date.now() + ((resp.expires_in || 3500) * 1000);
-            localStorage.setItem('fahras_google_token', googleAccessToken);
-            localStorage.setItem('fahras_google_expiry', String(googleTokenExpiry));
+            setTokenSession(resp.access_token, resp.expires_in);
             if (!googleUserProfile) await fetchGoogleUserProfile();
             updateGoogleUI();
             resolve(true);
@@ -130,7 +235,9 @@ function signInWithGoogle() {
 }
 
 function handleNavbarGoogleClick() {
-    if (googleUserProfile) {
+    if (needsReconnect) {
+        signInWithGoogle();
+    } else if (googleUserProfile) {
         showView('settings', document.getElementById('settingsTrigger'));
     } else {
         signInWithGoogle();
@@ -164,6 +271,7 @@ function updateGoogleUI() {
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const sidebarName = document.getElementById('sidebarUserName');
     const sidebarStatus = document.getElementById('sidebarSyncStatus');
+    const lastSyncLabel = document.getElementById('lastSyncLabel');
     const freqSelect = document.getElementById('syncFrequencySelect');
 
     if (freqSelect) freqSelect.value = syncSettings.frequency || 'instant';
@@ -180,10 +288,21 @@ function updateGoogleUI() {
         if (emailEl) emailEl.textContent = googleUserProfile.email;
 
         if (navBtn) {
-            navBtn.classList.add('connected');
-            navBtn.innerHTML = googleUserProfile.picture
-                ? `<img src="${googleUserProfile.picture}" alt=""><span>متصل</span>`
-                : `<i class="fab fa-google"></i><span>متصل</span>`;
+            if (needsReconnect) {
+                navBtn.classList.remove('connected');
+                navBtn.style.borderColor = 'var(--warning)';
+                navBtn.style.background = 'rgba(245, 158, 11, 0.15)';
+                navBtn.style.color = 'var(--warning)';
+                navBtn.innerHTML = `<i class="fas fa-exclamation-triangle"></i><span>إعادة الاتصال</span>`;
+            } else {
+                navBtn.classList.add('connected');
+                navBtn.style.borderColor = '';
+                navBtn.style.background = '';
+                navBtn.style.color = '';
+                navBtn.innerHTML = googleUserProfile.picture
+                    ? `<img src="${escapeHtml(googleUserProfile.picture)}" alt=""><span>متصل</span>`
+                    : `<i class="fab fa-google"></i><span>متصل</span>`;
+            }
         }
         if (sidebarName) sidebarName.textContent = googleUserProfile.name;
 
@@ -193,10 +312,24 @@ function updateGoogleUI() {
             manual: 'مزامنة يدوية'
         }[syncSettings.frequency] || 'مزامنة مفعّلة';
 
-        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-cloud-check" style="color:var(--success);"></i> ${modeText}`;
+        if (sidebarStatus) {
+            sidebarStatus.innerHTML = needsReconnect
+                ? `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> إعادة الاتصال`
+                : `<i class="fas fa-cloud-check" style="color:var(--success);"></i> ${modeText}`;
+        }
+
+        if (lastSyncLabel && needsReconnect) {
+            lastSyncLabel.style.background = 'rgba(245, 158, 11, 0.15)';
+            lastSyncLabel.style.color = 'var(--warning)';
+            lastSyncLabel.innerHTML = `<i class="fas fa-exclamation-triangle"></i> يلزم إعادة الاتصال`;
+        } else if (lastSyncLabel) {
+            lastSyncLabel.style.background = '';
+            lastSyncLabel.style.color = '';
+        }
+
         if (sidebarAvatar) {
             if (googleUserProfile.picture) {
-                sidebarAvatar.innerHTML = `<img src="${googleUserProfile.picture}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
+                sidebarAvatar.innerHTML = `<img src="${escapeHtml(googleUserProfile.picture)}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
             } else {
                 sidebarAvatar.textContent = googleUserProfile.name.charAt(0);
             }
@@ -206,6 +339,9 @@ function updateGoogleUI() {
         if (loggedInBox) loggedInBox.style.display = 'none';
         if (navBtn) {
             navBtn.classList.remove('connected');
+            navBtn.style.borderColor = '';
+            navBtn.style.background = '';
+            navBtn.style.color = '';
             navBtn.innerHTML = `<i class="fab fa-google"></i><span id="navGoogleText">دخول</span>`;
         }
         if (sidebarName) sidebarName.textContent = 'مستخدم جديد';
@@ -249,8 +385,8 @@ async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
     if (!valid) {
         const syncLabel = document.getElementById('lastSyncLabel');
         const sidebarStatus = document.getElementById('sidebarSyncStatus');
-        if (syncLabel) syncLabel.innerHTML = `<i class="fas fa-exclamation-circle" style="color:var(--warning);"></i> يلزم تجديد الجلسة`;
-        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> اضغط لتجديد المزامنة`;
+        if (syncLabel) syncLabel.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> يلزم إعادة الاتصال`;
+        if (sidebarStatus) sidebarStatus.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> إعادة الاتصال`;
         if (!silent) showToast('انتهت جلسة Google، اضغط على زر "رفع الآن" لتجديدها', 'info');
         return false;
     }
@@ -388,10 +524,18 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
                 if (mergedDeletedCats[cCat.id]) return;
                 const localIdx = categories.findIndex(c => c.id === cCat.id);
                 if (localIdx === -1) {
-                    categories.push(cCat);
+                    categories.push({
+                        ...cCat,
+                        color: sanitizeColor(cCat.color),
+                        icon: sanitizeIcon(cCat.icon)
+                    });
                     localChanged = true;
                 } else if ((cCat.updatedAt || 0) > (categories[localIdx].updatedAt || 0)) {
-                    categories[localIdx] = cCat;
+                    categories[localIdx] = {
+                        ...cCat,
+                        color: sanitizeColor(cCat.color),
+                        icon: sanitizeIcon(cCat.icon)
+                    };
                     localChanged = true;
                 }
             });
@@ -477,12 +621,10 @@ async function restoreFromDrive() {
 
 function signOutGoogle() {
     showConfirmModal('هل تريد تسجيل الخروج من حساب Google؟ ستبقى نسختك الاحتياطية محفوظة بأمان على Drive.', () => {
-        googleAccessToken = null;
-        googleTokenExpiry = 0;
-        googleUserProfile = null;
-        localStorage.removeItem('fahras_google_token');
-        localStorage.removeItem('fahras_google_expiry');
-        localStorage.removeItem('fahras_google_user');
+        if (googleAccessToken && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+            google.accounts.oauth2.revoke(googleAccessToken, () => {});
+        }
+        clearTokenSession(true);
         updateGoogleUI();
         showToast('تم تسجيل الخروج بنجاح', 'info');
     }, 'confirm');
@@ -508,12 +650,7 @@ function deleteGoogleAccountAndData() {
             console.error('Error deleting Drive file:', err);
         }
 
-        googleAccessToken = null;
-        googleTokenExpiry = 0;
-        googleUserProfile = null;
-        localStorage.removeItem('fahras_google_token');
-        localStorage.removeItem('fahras_google_expiry');
-        localStorage.removeItem('fahras_google_user');
+        clearTokenSession(true);
         updateGoogleUI();
         showToast('تم حذف النسخة السحابية وإلغاء ربط الحساب بنجاح', 'error');
     }, 'clear');
@@ -548,29 +685,87 @@ function updateThemeUI(theme) {
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    initPrivacyModal(); // إظهار نافذة سياسة الخصوصية إذا لم يتم اختيار "عدم العرض مرة أخرى"
+    updateGoogleUI(); // يعرض المستخدم كـ"متصل" فوراً من localStorage إذا كان مسجلاً
     initGoogleAuth();
-    updateGoogleUI();
     updateCategorySelect();
     renderAll();
 
-    // التحقق من المزامنة عند فتح التطبيق
-    if (googleUserProfile) {
-        const dayMs = 24 * 60 * 60 * 1000;
-        if (syncSettings.frequency === 'instant' || (syncSettings.frequency === 'daily' && (Date.now() - syncSettings.lastDailySync) >= dayMs)) {
-            syncWithDrive(true);
-        }
-    }
-
+    let searchDebounceTimer = null;
     document.getElementById('searchInput').addEventListener('input', function() {
-        performSearch(this.value);
+        clearTimeout(searchDebounceTimer);
+        const value = this.value;
+        searchDebounceTimer = setTimeout(() => performSearch(value), 200);
+    });
+
+    // مستمعو الأحداث الموحدون (Event Delegation) - مسجلون مرة واحدة فقط
+    document.getElementById('recentCards').addEventListener('click', handleCardClick);
+    document.getElementById('pinnedFavoritesStrip').addEventListener('click', handleCardClick);
+    document.getElementById('categoriesGrid').addEventListener('click', handleCategoryClick);
+    document.getElementById('categoryDetailCards').addEventListener('click', handleCardClick);
+    document.getElementById('quickFilterBar').addEventListener('click', handleFilterClick);
+
+    document.querySelectorAll('[data-view]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            showView(el.dataset.view, el);
+        });
     });
 
     startLiveSyncWatcher();
+    if (!localStorage.getItem('linkvault_categories')) {
+        localStorage.setItem('linkvault_categories', JSON.stringify(categories));
+    }
 });
+
+// ===== معالجات الأحداث الموحدة (Event Delegation) =====
+function handleCardClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    const url = btn.dataset.url;
+
+    // إذا كان الزر داخل البطاقة، نوقف انتشار الحدث لمنع فتح الرابط
+    if (action !== 'visit') e.stopPropagation();
+
+    switch (action) {
+        case 'visit':    visitLink(url, id); break;
+        case 'favorite': toggleFavorite(id); break;
+        case 'copy':     copyLink(url); break;
+        case 'edit':     editLink(id); break;
+        case 'delete':   deleteLink(id); break;
+    }
+}
+
+function handleCategoryClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+
+    if (action !== 'view-category') {
+        e.stopPropagation();
+    } else if (e.target.closest('.category-actions')) {
+        return;
+    }
+
+    switch (action) {
+        case 'view-category':   showCategoryDetail(id); break;
+        case 'edit-category':   editCategory(id); break;
+        case 'delete-category': deleteCategory(id); break;
+    }
+}
+
+function handleFilterClick(e) {
+    const btn = e.target.closest('[data-action="filter"]');
+    if (!btn) return;
+    setFilter(btn.dataset.filter);
+}
 
 // ===== الفحص التلقائي السريع للتحديثات من الأجهزة الأخرى =====
 async function checkForRemoteUpdates() {
-    if (!googleUserProfile || isSyncingNow) return;
+    if (!googleUserProfile || isSyncingNow || needsReconnect) return;
     if (syncSettings.frequency !== 'instant') return;
     if (document.visibilityState !== 'visible') return;
 
@@ -590,8 +785,7 @@ async function checkForRemoteUpdates() {
 
 function startLiveSyncWatcher() {
     if (liveSyncInterval) clearInterval(liveSyncInterval);
-    // فحص خفيف كل 4 ثوانٍ لاكتشاف التعديلات من الأجهزة الأخرى بسرعة
-    liveSyncInterval = setInterval(checkForRemoteUpdates, 4000);
+    liveSyncInterval = setInterval(checkForRemoteUpdates, 60000);
 }
 
 // مزامنة فورية عند العودة لتبويب التطبيق أو النقر على النافذة
@@ -612,10 +806,7 @@ function toggleSidebar() {
 }
 
 function handleLogoClick() {
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar.classList.contains('collapsed')) {
-        toggleSidebar();
-    }
+    toggleSidebar();
 }
 
 function toggleMobileSidebar() {
@@ -643,7 +834,7 @@ function showView(view, element) {
     };
     if (viewMap[view]) document.getElementById(viewMap[view]).classList.add('active');
     document.getElementById('pageTitle').textContent = {
-        dashboard: 'فِهرِس الروابط',
+        dashboard: 'فِهرِس - Fihris',
         categories: 'التصنيفات',
         statistics: 'الإحصائيات',
         settings: 'الإعدادات'
@@ -682,13 +873,13 @@ function renderPinnedFavorites() {
     countLabel.textContent = `${favs.length} ${favs.length === 1 ? 'رابط' : 'روابط'}`;
 
     strip.innerHTML = favs.map(link => {
-        const safeId = String(link.id).replace(/'/g, "\\'");
-        const safeUrl = (link.url || '').replace(/'/g, "\\'");
+        const escapedId = escapeHtml(String(link.id));
+        const escapedUrl = escapeHtml(link.url || '');
         const clicks = link.clicks || 0;
         return `
-            <div class="pinned-item" onclick="visitLink('${safeUrl}', '${safeId}')" title="${escapeHtml(link.url)}">
+            <div class="pinned-item" data-action="visit" data-id="${escapedId}" data-url="${escapedUrl}" title="${escapedUrl}">
                 <div class="pinned-favicon">
-                    <img src="${link.favicon}" alt="${escapeHtml(link.name)}" onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fas fa-heart\'></i>'">
+                    <img src="${escapeHtml(link.favicon || '')}" alt="${escapeHtml(link.name)}" onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fas fa-heart\'></i>'">
                 </div>
                 <div class="pinned-info">
                     <div class="pinned-name">${escapeHtml(link.name)}</div>
@@ -723,10 +914,10 @@ function renderFilterBar() {
     if (!bar) return;
     const favCount = links.filter(l => l.favorite).length;
     let html = `
-        <button class="filter-chip ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">
+        <button class="filter-chip ${currentFilter === 'all' ? 'active' : ''}" data-action="filter" data-filter="all">
             <i class="fas fa-globe"></i> الكل <span class="chip-count">${links.length}</span>
         </button>
-        <button class="filter-chip ${currentFilter === 'favorites' ? 'active' : ''}" onclick="setFilter('favorites')">
+        <button class="filter-chip ${currentFilter === 'favorites' ? 'active' : ''}" data-action="filter" data-filter="favorites">
             <i class="fas fa-heart"></i> المفضلة <span class="chip-count">${favCount}</span>
         </button>
     `;
@@ -736,17 +927,23 @@ function renderFilterBar() {
         .sort((a, b) => b.count - a.count);
 
     activeCats.forEach(cat => {
-        const safeId = String(cat.id).replace(/'/g, "\\'");
+        const escapedId = escapeHtml(String(cat.id));
+        const safeIcon = sanitizeIcon(cat.icon);
         html += `
-            <button class="filter-chip ${currentFilter === cat.id ? 'active' : ''}" onclick="setFilter('${safeId}')">
-                <i class="${cat.icon}"></i> ${escapeHtml(cat.name)} <span class="chip-count">${cat.count}</span>
+            <button class="filter-chip ${currentFilter === cat.id ? 'active' : ''}" data-action="filter" data-filter="${escapedId}">
+                <i class="${safeIcon}"></i> ${escapeHtml(cat.name)} <span class="chip-count">${cat.count}</span>
             </button>
         `;
     });
     bar.innerHTML = html;
 }
 
-function getFavicon(url) { try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`; } catch { return null; } }
+function getFavicon(url) {
+    try {
+        const hostname = new URL(url).hostname;
+        return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+    } catch { return null; }
+}
 function getDomain(url) { try { return new URL(url).hostname.replace('www.',''); } catch { return url; } }
 function updateCategorySelect() {
     const sel = document.getElementById('siteCategory');
@@ -760,21 +957,25 @@ function renderAll() {
     renderRecentCards();
     renderCategories();
     updateBadges();
-    if (currentView === 'statistics') renderCharts();
+    if (currentView === 'statistics' &&
+        document.getElementById('statisticsView').classList.contains('active')) {
+        renderCharts();
+    }
     if (currentView === 'categoryDetail' && currentCategoryDetailId) {
         showCategoryDetail(currentCategoryDetailId, false);
     }
 }
 
 function createCard(link) {
-    const cat = categories.find(c => c.id === link.category) || { name:'عام', color:'#0ea5e9' };
-    const safeId = String(link.id).replace(/'/g, "\\'");
-    const safeUrl = (link.url || '').replace(/'/g, "\\'");
+    const cat = categories.find(c => c.id === link.category) || { name: 'عام', color: '#0ea5e9' };
+    const escapedId = escapeHtml(String(link.id));
+    const escapedUrl = escapeHtml(link.url || '');
+    const safeColor = sanitizeColor(cat.color);
     const clicks = link.clicks || 0;
-    return `<div class="link-card" onclick="visitLink('${safeUrl}', '${safeId}')">
-                <div class="card-banner" style="background:linear-gradient(135deg,${cat.color},${adjustColor(cat.color,-40)})">
+    return `<div class="link-card" data-action="visit" data-id="${escapedId}" data-url="${escapedUrl}">
+                <div class="card-banner" style="background:linear-gradient(135deg,${safeColor},${adjustColor(safeColor, -40)})">
                     <div class="card-favicon">
-                        <img src="${link.favicon}" alt="${escapeHtml(link.name)}" onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fas fa-globe\'></i>'">
+                        <img src="${escapeHtml(link.favicon || '')}" alt="${escapeHtml(link.name)}" onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fas fa-globe\'></i>'">
                     </div>
                 </div>
                 <div class="card-body">
@@ -788,10 +989,10 @@ function createCard(link) {
                     <div class="card-footer">
                         <span class="card-date"><i class="far fa-calendar"></i> ${escapeHtml(link.date)}</span>
                         <div class="card-actions">
-                            <button class="card-action-btn fav" title="المفضلة" style="${link.favorite?'color:#f43f5e':''}" onclick="event.stopPropagation();toggleFavorite('${safeId}')"><i class="${link.favorite?'fas':'far'} fa-heart"></i></button>
-                            <button class="card-action-btn copy" title="نسخ الرابط" onclick="event.stopPropagation();copyLink('${safeUrl}')"><i class="fas fa-copy"></i></button>
-                            <button class="card-action-btn edit" title="تعديل" onclick="event.stopPropagation();editLink('${safeId}')"><i class="fas fa-edit"></i></button>
-                            <button class="card-action-btn delete" title="حذف" onclick="event.stopPropagation();deleteLink('${safeId}')"><i class="fas fa-trash"></i></button>
+                            <button class="card-action-btn fav" title="المفضلة" style="${link.favorite ? 'color:#f43f5e' : ''}" data-action="favorite" data-id="${escapedId}"><i class="${link.favorite ? 'fas' : 'far'} fa-heart"></i></button>
+                            <button class="card-action-btn copy" title="نسخ الرابط" data-action="copy" data-url="${escapedUrl}"><i class="fas fa-copy"></i></button>
+                            <button class="card-action-btn edit" title="تعديل" data-action="edit" data-id="${escapedId}"><i class="fas fa-edit"></i></button>
+                            <button class="card-action-btn delete" title="حذف" data-action="delete" data-id="${escapedId}"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                 </div>
@@ -830,14 +1031,16 @@ function renderCategories() {
     const container = document.getElementById('categoriesGrid');
     container.innerHTML = categories.map(cat => {
         const count = links.filter(l => l.category === cat.id).length;
-        const safeCatId = String(cat.id).replace(/'/g, "\\'");
-        return `<div class="category-card" onclick="showCategoryDetail('${safeCatId}')">
-                    <div class="category-icon" style="background:${cat.color}20;color:${cat.color}"><i class="${cat.icon}"></i></div>
+        const escapedCatId = escapeHtml(String(cat.id));
+        const safeColor = sanitizeColor(cat.color);
+        const safeIcon = sanitizeIcon(cat.icon);
+        return `<div class="category-card" data-action="view-category" data-id="${escapedCatId}">
+                    <div class="category-icon" style="background:${safeColor}20;color:${safeColor}"><i class="${safeIcon}"></i></div>
                     <div class="category-name">${escapeHtml(cat.name)}</div>
                     <div class="category-count">${count} رابط</div>
-                    <div class="category-actions" onclick="event.stopPropagation()">
-                        <button class="cat-action-btn edit" title="تعديل التصنيف" onclick="editCategory('${safeCatId}')"><i class="fas fa-edit"></i></button>
-                        <button class="cat-action-btn delete" title="حذف التصنيف" onclick="deleteCategory('${safeCatId}')"><i class="fas fa-trash"></i></button>
+                    <div class="category-actions">
+                        <button class="cat-action-btn edit" title="تعديل التصنيف" data-action="edit-category" data-id="${escapedCatId}"><i class="fas fa-edit"></i></button>
+                        <button class="cat-action-btn delete" title="حذف التصنيف" data-action="delete-category" data-id="${escapedCatId}"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
     }).join('');
@@ -855,7 +1058,8 @@ function showCategoryDetail(catId, switchView = true) {
         const fabBtn = document.querySelector('.mobile-fab-btn');
         if (fabBtn) fabBtn.style.visibility = 'visible';
     }
-    document.getElementById('categoryDetailTitle').innerHTML = `<i class="fas fa-folder" style="color:${cat.color}"></i> ${escapeHtml(cat.name)}`;
+    const safeColor = sanitizeColor(cat.color);
+    document.getElementById('categoryDetailTitle').innerHTML = `<i class="fas fa-folder" style="color:${safeColor}"></i> ${escapeHtml(cat.name)}`;
     const catLinks = links.filter(l => l.category === catId);
     document.getElementById('categoryDetailCards').innerHTML = catLinks.length ? catLinks.map(createCard).join('') : emptyHTML('لا توجد روابط','في هذا التصنيف');
     document.getElementById('pageTitle').textContent = cat.name;
@@ -948,15 +1152,25 @@ function saveLink(e) {
     }
 
     saveData();
-    renderAll();
+    renderPinnedFavorites();
+    renderFilterBar();
+    renderRecentCards();
+    updateBadges();
     closeModal();
 }
 
 function saveCategory(e) {
     e.preventDefault();
     const name = document.getElementById('categoryName').value.trim();
-    const icon = document.getElementById('categoryIcon').value.trim() || 'fas fa-folder';
-    const color = document.querySelector('.color-option.selected')?.dataset.color || '#0ea5e9';
+    const rawIcon = document.getElementById('categoryIcon').value.trim();
+    const rawColor = document.querySelector('.color-option.selected')?.dataset.color;
+
+    const color = sanitizeColor(rawColor);
+    const icon = sanitizeIcon(rawIcon);
+
+    if ((rawIcon && !isValidFontAwesomeIcon(rawIcon)) || (rawColor && !isValidHexColor(rawColor))) {
+        showToast('تم استبدال الأيقونة/اللون بقيمة افتراضية لعدم صلاحيتها', 'info');
+    }
 
     if (editingCategoryId) {
         const idx = categories.findIndex(c => c.id === editingCategoryId);
@@ -970,21 +1184,24 @@ function saveCategory(e) {
     }
 
     saveData();
+    renderCategories();
     updateCategorySelect();
-    renderAll();
     closeCategoryModal();
 }
 
 function editCategory(id) {
     const cat = categories.find(c => c.id === id);
     if (!cat) return;
+    const safeColor = sanitizeColor(cat.color);
+    const safeIcon = sanitizeIcon(cat.icon);
+
     editingCategoryId = id;
     document.getElementById('categoryModalTitle').innerHTML = '<i class="fas fa-edit"></i> تعديل تصنيف';
     document.getElementById('categorySubmitBtn').innerHTML = '<i class="fas fa-save"></i> حفظ التعديلات';
     document.getElementById('editingCategoryId').value = id;
     document.getElementById('categoryName').value = cat.name;
-    document.getElementById('categoryIcon').value = cat.icon;
-    document.querySelectorAll('.color-option').forEach(c => c.classList.toggle('selected', c.dataset.color === cat.color));
+    document.getElementById('categoryIcon').value = safeIcon;
+    document.querySelectorAll('.color-option').forEach(c => c.classList.toggle('selected', c.dataset.color === safeColor));
     document.getElementById('categoryModal').classList.add('active');
     document.getElementById('categoryName').focus();
 }
@@ -1021,7 +1238,10 @@ function deleteCategory(id) {
         syncTombstones.deletedCategories[String(id)] = Date.now();
         saveSyncMeta();
         saveData();
-        renderAll();
+        renderCategories();
+        renderRecentCards();
+        renderFilterBar();
+        updateBadges();
         updateCategorySelect();
         showToast('تم حذف التصنيف بنجاح', 'error');
     }, 'delete');
@@ -1031,13 +1251,7 @@ function clearAllData() {
     showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات نهائياً من هذا الجهاز ومن السحابة. هل أنت متأكد؟', async () => {
         links = [];
         currentFilter = 'all';
-        categories = [
-            { id:'general', name:'عام', icon:'fas fa-globe', color:'#0ea5e9', updatedAt: Date.now() },
-            { id:'dev', name:'تطوير', icon:'fas fa-code', color:'#10b981', updatedAt: Date.now() },
-            { id:'design', name:'تصميم', icon:'fas fa-paint-brush', color:'#f43f5e', updatedAt: Date.now() },
-            { id:'edu', name:'تعليم', icon:'fas fa-graduation-cap', color:'#14b8a6', updatedAt: Date.now() },
-            { id:'news', name:'أخبار', icon:'fas fa-newspaper', color:'#f59e0b', updatedAt: Date.now() }
-        ];
+        categories = DEFAULT_CATEGORIES.map(c => ({ ...c, updatedAt: Date.now() }));
 
         syncTombstones.clearedAt = Date.now();
         syncTombstones.deletedLinks = {};
@@ -1076,7 +1290,8 @@ function toggleFavorite(id) {
         link.favorite = !link.favorite;
         link.updatedAt = Date.now();
         saveData();
-        renderAll();
+        renderPinnedFavorites();
+        renderRecentCards();
         showToast(link.favorite ? 'ثُبّت في شريط المفضلة!' : 'أُزيل من المفضلة', 'info');
     }
 }
@@ -1114,19 +1329,22 @@ function performSearch(term) {
     term = term.toLowerCase().trim();
     document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
     document.getElementById('dashboardView').classList.add('active');
-    document.getElementById('pageTitle').textContent = term ? 'نتائج البحث' : 'فِهرِس الروابط';
+    document.getElementById('pageTitle').textContent = term ? 'نتائج البحث' : 'فِهرِس - Fihris';
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    document.querySelector('a[onclick*=dashboard]').classList.add('active');
+    document.getElementById('navDashboard').classList.add('active');
     currentView = 'dashboard';
     if (!term) {
         renderRecentCards();
         return;
     }
-    const filtered = links.filter(l =>
-        l.name.toLowerCase().includes(term) ||
-        (l.description && l.description.toLowerCase().includes(term)) ||
-        l.domain.toLowerCase().includes(term)
-    );
+    const filtered = links.filter(l => {
+        const cat = categories.find(c => c.id === l.category);
+        const catName = cat ? cat.name.toLowerCase() : '';
+        return l.name.toLowerCase().includes(term) ||
+            (l.description && l.description.toLowerCase().includes(term)) ||
+            l.domain.toLowerCase().includes(term) ||
+            catName.includes(term);
+    });
     document.getElementById('recentCards').innerHTML = filtered.length
         ? filtered.map(createCard).join('')
         : emptyHTML('لا توجد نتائج', 'جرب البحث بكلمات مختلفة');
@@ -1148,9 +1366,16 @@ function mergeImportedObject(data) {
 
     if (data.categories && Array.isArray(data.categories)) {
         data.categories.forEach(importedCat => {
+            if (!importedCat || typeof importedCat !== 'object' || typeof importedCat.name !== 'string') return;
             const exists = categories.some(c => c.name.trim().toLowerCase() === importedCat.name.trim().toLowerCase());
             if (!exists) {
-                categories.push({ ...importedCat, id: 'cat_' + generateUniqueId(), updatedAt: Date.now() });
+                categories.push({
+                    ...importedCat,
+                    id: 'cat_' + generateUniqueId(),
+                    color: sanitizeColor(importedCat.color),
+                    icon: sanitizeIcon(importedCat.icon),
+                    updatedAt: Date.now()
+                });
                 addedCategories++;
             } else {
                 skippedCategories++;
@@ -1161,8 +1386,10 @@ function mergeImportedObject(data) {
     if (data.links && Array.isArray(data.links)) {
         data.links.forEach(importedLink => {
             const normalizedUrl = (importedLink.url || '').replace(/\/+$/, '').toLowerCase();
-            const exists = links.some(l => (l.url || '').replace(/\/+$/, '').toLowerCase() === normalizedUrl);
-            if (!exists) {
+            const existingIdx = links.findIndex(l =>
+                (l.url || '').replace(/\/+$/, '').toLowerCase() === normalizedUrl
+            );
+            if (existingIdx === -1) {
                 let catId = importedLink.category || '';
                 if (catId && !categories.some(c => c.id === catId)) {
                     const oldCat = data.categories?.find(c => c.id === catId);
@@ -1190,6 +1417,18 @@ function mergeImportedObject(data) {
                     clicks: typeof importedLink.clicks === 'number' ? importedLink.clicks : 0
                 });
                 addedLinks++;
+            } else if ((importedLink.updatedAt || 0) > (links[existingIdx].updatedAt || 0)) {
+                links[existingIdx] = {
+                    ...links[existingIdx],
+                    name: importedLink.name || links[existingIdx].name,
+                    description: importedLink.description || links[existingIdx].description,
+                    favorite: importedLink.favorite === true,
+                    category: links[existingIdx].category,
+                    favicon: getFavicon(importedLink.url),
+                    domain: getDomain(importedLink.url),
+                    updatedAt: importedLink.updatedAt
+                };
+                skippedLinks++;
             } else {
                 skippedLinks++;
             }
@@ -1218,6 +1457,17 @@ function handleImport(e) {
     reader.onload = function(ev) {
         try {
             const data = JSON.parse(ev.target.result);
+            if (!data || typeof data !== 'object') {
+                showToast('بنية ملف JSON غير صالحة.', 'error');
+                return;
+            }
+            if (Array.isArray(data.categories)) {
+                data.categories = data.categories.filter(
+                    c => c !== null && typeof c === 'object' && !Array.isArray(c)
+                );
+            } else {
+                data.categories = [];
+            }
             mergeImportedObject(data);
         } catch (err) {
             console.error(err);
@@ -1284,7 +1534,9 @@ function showToast(msg, type = 'success') {
     const titles = { success: 'تم!', error: 'خطأ!', info: 'تنبيه!' };
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<div class="toast-icon"><i class="fas ${icons[type]}"></i></div><div class="toast-content"><div class="toast-title">${titles[type]}</div><div class="toast-message">${msg}</div></div><button class="toast-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+    toast.innerHTML = `<div class="toast-icon"><i class="fas ${icons[type]}"></i></div><div class="toast-content"><div class="toast-title">${titles[type]}</div><div class="toast-message">${msg}</div></div><button class="toast-close"><i class="fas fa-times"></i></button>`;
+    const closeBtn = toast.querySelector('.toast-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => toast.remove());
     container.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('hiding');
@@ -1386,6 +1638,10 @@ function renderCharts() {
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
+            if (overlay.id === 'privacyWelcomeModal') {
+                closePrivacyModal();
+                return;
+            }
             overlay.classList.remove('active');
             if (overlay.id === 'confirmModal') confirmCallback = null;
         }
@@ -1394,9 +1650,14 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+        if (document.getElementById('privacyWelcomeModal')?.classList.contains('active')) {
+            closePrivacyModal();
+        }
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
         document.getElementById('sidebar')?.classList.remove('active');
         document.getElementById('sidebarOverlay')?.classList.remove('active');
+        confirmCallback = null;
+        editingId = null;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();

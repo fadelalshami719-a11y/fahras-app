@@ -62,6 +62,19 @@ function sanitizeIcon(icon, fallback = 'fas fa-folder') {
     return isValidFontAwesomeIcon(icon) ? icon : fallback;
 }
 
+function sanitizeUrl(url) {
+    if (typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed;
+    try {
+        const parsed = new URL(candidate);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? candidate : '';
+    } catch {
+        return '';
+    }
+}
+
 // ===== دوال إدارة جلسة التوكن والحماية =====
 function setTokenSession(accessToken, expiresInSeconds = 3500) {
     const lifetimeMs = Math.min(Number(expiresInSeconds || 3500) * 1000, MAX_LOCAL_SESSION_MS);
@@ -297,7 +310,7 @@ function updateGoogleUI() {
         if (sidebarStatus) {
             sidebarStatus.innerHTML = needsReconnect
                 ? `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> إعادة الاتصال`
-                : `<i class="fas fa-cloud-check" style="color:var(--success);"></i> ${modeText}`;
+                : `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${modeText}`;
         }
 
         if (lastSyncLabel && needsReconnect) {
@@ -307,6 +320,7 @@ function updateGoogleUI() {
         } else if (lastSyncLabel) {
             lastSyncLabel.style.background = '';
             lastSyncLabel.style.color = '';
+            lastSyncLabel.innerHTML = `<i class="fas fa-check-circle"></i> متصل بـ Google Drive`;
         }
 
         if (sidebarAvatar) {
@@ -341,7 +355,7 @@ function changeSyncFrequency(newFreq) {
         daily: 'تم ضبط المزامنة التلقائية كل 24 ساعة',
         manual: 'تم ضبط المزامنة على الوضع اليدوي فقط'
     };
-    showToast(labels[newFreq] || 'تم حفظ إعداد المزامنة', 'info');
+    showToast(labels[newFreq] || 'تم حفظ إعداد المزامنة', 'success');
     if (newFreq === 'instant' && googleUserProfile) {
         uploadBackupToDrive(true);
     }
@@ -525,6 +539,11 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
 
         if (Array.isArray(cloudData.links)) {
             cloudData.links.forEach(cLink => {
+                if (!cLink || typeof cLink !== 'object') return;
+                const safeUrl = sanitizeUrl(cLink.url);
+                if (!safeUrl) return;
+                cLink.url = safeUrl;
+
                 const created = cLink.timestamp || 0;
                 if (created < effectiveClearedAt) return;
                 if (mergedDeletedLinks[cLink.id]) return;
@@ -555,6 +574,9 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
             });
         }
         if (Object.keys(syncTombstones.deletedLinks).length > Object.keys(cloudTomb.deletedLinks || {}).length) {
+            needUploadToCloud = true;
+        }
+        if (Object.keys(syncTombstones.deletedCategories).length > Object.keys(cloudTomb.deletedCategories || {}).length) {
             needUploadToCloud = true;
         }
         if (syncTombstones.clearedAt > (cloudTomb.clearedAt || 0)) {
@@ -604,11 +626,11 @@ async function restoreFromDrive() {
 function signOutGoogle() {
     showConfirmModal('هل تريد تسجيل الخروج من حساب Google؟ ستبقى نسختك الاحتياطية محفوظة بأمان على Drive.', () => {
         if (googleAccessToken && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-            google.accounts.oauth2.revoke(googleAccessToken, () => {});
+            google.accounts.oauth2.revoke(googleAccessToken, () => { });
         }
         clearTokenSession(true);
         updateGoogleUI();
-        showToast('تم تسجيل الخروج بنجاح', 'info');
+        showToast('تم تسجيل الخروج بنجاح', 'success');
     }, 'confirm');
 }
 
@@ -625,7 +647,7 @@ function deleteGoogleAccountAndData() {
                     });
                 }
                 if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-                    google.accounts.oauth2.revoke(googleAccessToken, () => {});
+                    google.accounts.oauth2.revoke(googleAccessToken, () => { });
                 }
             }
         } catch (err) {
@@ -634,13 +656,14 @@ function deleteGoogleAccountAndData() {
 
         clearTokenSession(true);
         updateGoogleUI();
-        showToast('تم حذف النسخة السحابية وإلغاء ربط الحساب بنجاح', 'error');
+        showToast('تم حذف النسخة السحابية وإلغاء ربط الحساب بنجاح', 'success');
     }, 'clear');
 }
 
 // ===== المظهر والتهيئة =====
 function initTheme() {
     const saved = localStorage.getItem('linkvault_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
     document.body.setAttribute('data-theme', saved);
     document.getElementById('themeToggle').checked = saved === 'dark';
     updateThemeUI(saved);
@@ -649,11 +672,12 @@ function initTheme() {
 function toggleTheme() {
     const current = document.body.getAttribute('data-theme');
     const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
     document.body.setAttribute('data-theme', next);
     localStorage.setItem('linkvault_theme', next);
     document.getElementById('themeToggle').checked = next === 'dark';
     updateThemeUI(next);
-    showToast(next === 'dark' ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع النهاري', 'info');
+    showToast(next === 'dark' ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع النهاري', 'success');
     if (currentView === 'statistics') setTimeout(() => renderCharts(), 200);
 }
 
@@ -673,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAll();
 
     let searchDebounceTimer = null;
-    document.getElementById('searchInput').addEventListener('input', function() {
+    document.getElementById('searchInput').addEventListener('input', function () {
         clearTimeout(searchDebounceTimer);
         const value = this.value;
         searchDebounceTimer = setTimeout(() => performSearch(value), 200);
@@ -711,11 +735,11 @@ function handleCardClick(e) {
     if (action !== 'visit') e.stopPropagation();
 
     switch (action) {
-        case 'visit':    visitLink(url, id); break;
+        case 'visit': visitLink(url, id); break;
         case 'favorite': toggleFavorite(id); break;
-        case 'copy':     copyLink(url); break;
-        case 'edit':     editLink(id); break;
-        case 'delete':   deleteLink(id); break;
+        case 'copy': copyLink(url); break;
+        case 'edit': editLink(id); break;
+        case 'delete': deleteLink(id); break;
     }
 }
 
@@ -732,8 +756,8 @@ function handleCategoryClick(e) {
     }
 
     switch (action) {
-        case 'view-category':   showCategoryDetail(id); break;
-        case 'edit-category':   editCategory(id); break;
+        case 'view-category': showCategoryDetail(id); break;
+        case 'edit-category': editCategory(id); break;
         case 'delete-category': deleteCategory(id); break;
     }
 }
@@ -925,11 +949,23 @@ function getFavicon(url) {
         return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
     } catch { return null; }
 }
-function getDomain(url) { try { return new URL(url).hostname.replace('www.',''); } catch { return url; } }
+function getDomain(url) { try { return new URL(url).hostname.replace('www.', ''); } catch { return url; } }
+function dismissIntroBanner(permanent = false) {
+    const banner = document.getElementById('crawlerVisibleIntro');
+    if (banner) banner.style.display = 'none';
+    if (permanent) {
+        localStorage.setItem('fahras_hide_intro', '1');
+        showToast('لن يتم عرض هذه الرسالة مرة أخرى', 'success');
+    }
+}
+
 function updateCategorySelect() {
     const sel = document.getElementById('siteCategory');
-    sel.innerHTML = '<option value="">بدون تصنيف</option>';
-    categories.forEach(c => sel.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`);
+    const uncat = categories.find(c => c.id === 'uncategorized' || c.name.trim() === 'بدون تصنيف');
+    sel.innerHTML = `<option value="${uncat ? escapeHtml(uncat.id) : ''}">بدون تصنيف</option>`;
+    categories
+        .filter(c => !uncat || c.id !== uncat.id)
+        .forEach(c => sel.innerHTML += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`);
 }
 
 function renderAll() {
@@ -948,7 +984,7 @@ function renderAll() {
 }
 
 function createCard(link) {
-    const cat = categories.find(c => c.id === link.category) || { name: 'عام', color: '#0ea5e9' };
+    const cat = categories.find(c => c.id === link.category) || { name: 'بدون تصنيف', color: '#0ea5e9' };
     const escapedId = escapeHtml(String(link.id));
     const escapedUrl = escapeHtml(link.url || '');
     const safeColor = sanitizeColor(cat.color);
@@ -982,19 +1018,32 @@ function createCard(link) {
 
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>"']/g, function(m) {
+    return str.replace(/[&<>"']/g, function (m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
     });
 }
 
 function renderRecentCards() {
     const container = document.getElementById('recentCards');
+    const searchEl = document.getElementById('searchInput');
+    const term = searchEl ? searchEl.value.toLowerCase().trim() : '';
     let filtered = [...links];
 
     if (currentFilter === 'favorites') {
         filtered = filtered.filter(l => l.favorite);
     } else if (currentFilter !== 'all') {
         filtered = filtered.filter(l => l.category === currentFilter);
+    }
+
+    if (term) {
+        filtered = filtered.filter(l => {
+            const cat = categories.find(c => c.id === l.category);
+            const catName = cat ? cat.name.toLowerCase() : '';
+            return l.name.toLowerCase().includes(term) ||
+                (l.description && l.description.toLowerCase().includes(term)) ||
+                (l.domain && l.domain.toLowerCase().includes(term)) ||
+                catName.includes(term);
+        });
     }
 
     if (currentSort === 'popular') {
@@ -1005,7 +1054,7 @@ function renderRecentCards() {
 
     container.innerHTML = filtered.length
         ? filtered.map(createCard).join('')
-        : emptyHTML('لا توجد روابط هنا', 'جرّب تغيير الفلتر أو أضف رابطاً جديداً');
+        : emptyHTML(term ? 'لا توجد نتائج' : 'لا توجد روابط هنا', term ? 'جرّب البحث بكلمات مختلفة أو تغيير الفلتر' : 'جرّب تغيير الفلتر أو أضف رابطاً جديداً');
 }
 
 function renderCategories() {
@@ -1042,7 +1091,7 @@ function showCategoryDetail(catId, switchView = true) {
     const safeColor = sanitizeColor(cat.color);
     document.getElementById('categoryDetailTitle').innerHTML = `<i class="fas fa-folder" style="color:${safeColor}"></i> ${escapeHtml(cat.name)}`;
     const catLinks = links.filter(l => l.category === catId);
-    document.getElementById('categoryDetailCards').innerHTML = catLinks.length ? catLinks.map(createCard).join('') : emptyHTML('لا توجد روابط','في هذا التصنيف');
+    document.getElementById('categoryDetailCards').innerHTML = catLinks.length ? catLinks.map(createCard).join('') : emptyHTML('لا توجد روابط', 'في هذا التصنيف');
     document.getElementById('pageTitle').textContent = cat.name;
 }
 
@@ -1097,11 +1146,14 @@ function selectColor(el) {
 function saveLink(e) {
     e.preventDefault();
     const name = document.getElementById('siteName').value.trim();
-    let url = document.getElementById('siteUrl').value.trim();
+    const url = sanitizeUrl(document.getElementById('siteUrl').value);
+    if (!url) {
+        showToast('يرجى إدخال رابط موقع صحيح', 'error');
+        return;
+    }
     const category = document.getElementById('siteCategory').value;
     const favorite = document.getElementById('siteFavorite').value === 'true';
     const description = document.getElementById('siteDesc').value.trim();
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
     if (editingId) {
         const idx = links.findIndex(l => String(l.id) === String(editingId));
@@ -1133,10 +1185,7 @@ function saveLink(e) {
     }
 
     saveData();
-    renderPinnedFavorites();
-    renderFilterBar();
-    renderRecentCards();
-    updateBadges();
+    renderAll();
     closeModal();
 }
 
@@ -1196,7 +1245,7 @@ function deleteLink(id) {
         saveSyncMeta();
         saveData();
         renderAll();
-        showToast('تم حذف الرابط بنجاح', 'error');
+        showToast('تم حذف الرابط بنجاح', 'success');
     }, 'delete');
 }
 
@@ -1204,27 +1253,48 @@ function deleteCategory(id) {
     const cat = categories.find(c => c.id === id);
     if (!cat) return;
     const count = links.filter(l => l.category === id).length;
+    const isDeletingUncat = (cat.id === 'uncategorized' || cat.name.trim() === 'بدون تصنيف');
     const msg = count > 0
-        ? `التصنيف "${cat.name}" يحتوي على ${count} رابط. سيتم نقل الروابط إلى "بدون تصنيف". هل تريد المتابعة؟`
+        ? (isDeletingUncat
+            ? `التصنيف "${cat.name}" يحتوي على ${count} رابط. سيتم إبقاء الروابط بدون تصنيف. هل تريد المتابعة؟`
+            : `التصنيف "${cat.name}" يحتوي على ${count} رابط. سيتم نقل الروابط إلى تصنيف "بدون تصنيف". هل تريد المتابعة؟`)
         : `هل أنت متأكد من حذف التصنيف "${cat.name}"؟`;
+
     showConfirmModal(msg, () => {
+        let targetCatId = '';
+        if (count > 0 && !isDeletingUncat) {
+            let uncat = categories.find(c => c.id !== id && (c.id === 'uncategorized' || c.name.trim() === 'بدون تصنيف'));
+            if (!uncat) {
+                uncat = {
+                    id: 'uncategorized',
+                    name: 'بدون تصنيف',
+                    icon: 'fas fa-folder-open',
+                    color: '#64748b',
+                    updatedAt: Date.now()
+                };
+                categories.push(uncat);
+                delete syncTombstones.deletedCategories['uncategorized'];
+            } else {
+                uncat.updatedAt = Date.now();
+            }
+            targetCatId = uncat.id;
+        }
+
         links.forEach(l => {
-            if (l.category === id) {
-                l.category = '';
+            if (l.category === id || (targetCatId && !l.category)) {
+                l.category = targetCatId;
                 l.updatedAt = Date.now();
             }
         });
-        if (currentFilter === id) currentFilter = 'all';
+
+        if (currentFilter === id) currentFilter = targetCatId || 'all';
         categories = categories.filter(c => c.id !== id);
         syncTombstones.deletedCategories[String(id)] = Date.now();
         saveSyncMeta();
         saveData();
-        renderCategories();
-        renderRecentCards();
-        renderFilterBar();
-        updateBadges();
+        renderAll();
         updateCategorySelect();
-        showToast('تم حذف التصنيف بنجاح', 'error');
+        showToast(targetCatId ? 'تم حذف التصنيف ونقل الروابط إلى "بدون تصنيف"' : 'تم حذف التصنيف بنجاح', 'success');
     }, 'delete');
 }
 
@@ -1236,13 +1306,14 @@ function clearAllData() {
 
         syncTombstones.clearedAt = Date.now();
         syncTombstones.deletedLinks = {};
+        syncTombstones.deletedCategories = {};
         saveSyncMeta();
 
         localStorage.setItem('linkvault_links', JSON.stringify(links));
         localStorage.setItem('linkvault_categories', JSON.stringify(categories));
         renderAll();
         updateCategorySelect();
-        showToast('تم حذف جميع البيانات ومزامنة الحذف مع السحابة', 'error');
+        showToast('تم حذف جميع البيانات بنجاح', 'success');
 
         if (googleUserProfile) {
             await uploadBackupToDrive(true, true);
@@ -1271,26 +1342,30 @@ function toggleFavorite(id) {
         link.favorite = !link.favorite;
         link.updatedAt = Date.now();
         saveData();
-        renderPinnedFavorites();
-        renderRecentCards();
-        showToast(link.favorite ? 'ثُبّت في شريط المفضلة!' : 'أُزيل من المفضلة', 'info');
+        renderAll();
+        showToast(link.favorite ? 'تمت الإضافة إلى المفضلة!' : 'تمت الإزالة من المفضلة', 'success');
     }
 }
 
 function copyLink(url) {
     navigator.clipboard.writeText(url).then(() => showToast('تم نسخ الرابط!', 'success'))
-    .catch(() => {
-        const t = document.createElement('textarea');
-        t.value = url;
-        document.body.appendChild(t);
-        t.select();
-        document.execCommand('copy');
-        document.body.removeChild(t);
-        showToast('تم نسخ الرابط!', 'success');
-    });
+        .catch(() => {
+            const t = document.createElement('textarea');
+            t.value = url;
+            document.body.appendChild(t);
+            t.select();
+            document.execCommand('copy');
+            document.body.removeChild(t);
+            showToast('تم نسخ الرابط!', 'success');
+        });
 }
 
 function visitLink(url, id) {
+    const safeUrl = sanitizeUrl(url);
+    if (!safeUrl) {
+        showToast('الرابط غير صالح للفتح', 'error');
+        return;
+    }
     if (id) {
         const link = links.find(l => String(l.id) === String(id));
         if (link) {
@@ -1298,12 +1373,10 @@ function visitLink(url, id) {
             link.lastVisited = Date.now();
             link.updatedAt = Date.now();
             saveData();
-            renderPinnedFavorites();
-            renderRecentCards();
-            if (currentView === 'statistics') renderCharts();
+            renderAll();
         }
     }
-    window.open(url, '_blank');
+    window.open(safeUrl, '_blank', 'noopener,noreferrer');
 }
 
 function performSearch(term) {
@@ -1312,23 +1385,13 @@ function performSearch(term) {
     document.getElementById('dashboardView').classList.add('active');
     document.getElementById('pageTitle').textContent = term ? 'نتائج البحث' : 'فِهرِس - Fihris';
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    document.getElementById('settingsTrigger')?.classList.remove('active-settings');
     document.getElementById('navDashboard').classList.add('active');
+    const fabBtn = document.querySelector('.mobile-fab-btn');
+    if (fabBtn) fabBtn.style.visibility = 'visible';
     currentView = 'dashboard';
-    if (!term) {
-        renderRecentCards();
-        return;
-    }
-    const filtered = links.filter(l => {
-        const cat = categories.find(c => c.id === l.category);
-        const catName = cat ? cat.name.toLowerCase() : '';
-        return l.name.toLowerCase().includes(term) ||
-            (l.description && l.description.toLowerCase().includes(term)) ||
-            l.domain.toLowerCase().includes(term) ||
-            catName.includes(term);
-    });
-    document.getElementById('recentCards').innerHTML = filtered.length
-        ? filtered.map(createCard).join('')
-        : emptyHTML('لا توجد نتائج', 'جرب البحث بكلمات مختلفة');
+    currentCategoryDetailId = null;
+    renderRecentCards();
 }
 
 function exportData() {
@@ -1366,7 +1429,10 @@ function mergeImportedObject(data) {
 
     if (data.links && Array.isArray(data.links)) {
         data.links.forEach(importedLink => {
-            const normalizedUrl = (importedLink.url || '').replace(/\/+$/, '').toLowerCase();
+            if (!importedLink || typeof importedLink !== 'object') return;
+            const safeUrl = sanitizeUrl(importedLink.url);
+            if (!safeUrl) return;
+            const normalizedUrl = safeUrl.replace(/\/+$/, '').toLowerCase();
             const existingIdx = links.findIndex(l =>
                 (l.url || '').replace(/\/+$/, '').toLowerCase() === normalizedUrl
             );
@@ -1385,12 +1451,12 @@ function mergeImportedObject(data) {
                 links.push({
                     id: generateUniqueId(),
                     name: importedLink.name || 'بدون عنوان',
-                    url: importedLink.url,
+                    url: safeUrl,
                     category: catId,
                     favorite: importedLink.favorite === true,
                     description: importedLink.description || '',
-                    favicon: getFavicon(importedLink.url),
-                    domain: getDomain(importedLink.url),
+                    favicon: getFavicon(safeUrl),
+                    domain: getDomain(safeUrl),
                     date: importedLink.date || new Date().toLocaleDateString('ar-SA'),
                     timestamp: now,
                     updatedAt: now,
@@ -1405,8 +1471,8 @@ function mergeImportedObject(data) {
                     description: importedLink.description || links[existingIdx].description,
                     favorite: importedLink.favorite === true,
                     category: links[existingIdx].category,
-                    favicon: getFavicon(importedLink.url),
-                    domain: getDomain(importedLink.url),
+                    favicon: getFavicon(safeUrl),
+                    domain: getDomain(safeUrl),
                     updatedAt: importedLink.updatedAt
                 };
                 skippedLinks++;
@@ -1435,7 +1501,7 @@ function handleImport(e) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = function (ev) {
         try {
             const data = JSON.parse(ev.target.result);
             if (!data || typeof data !== 'object') {
@@ -1478,7 +1544,7 @@ function showConfirmModal(message, onConfirm, type = 'delete') {
         btnEl.innerHTML = '<i class="fas fa-check"></i> تأكيد';
     }
     confirmCallback = onConfirm;
-    document.getElementById('confirmModalBtn').onclick = function() {
+    document.getElementById('confirmModalBtn').onclick = function () {
         if (confirmCallback) confirmCallback();
         closeConfirmModal();
     };
@@ -1560,7 +1626,7 @@ function renderCharts() {
     });
 
     const colors = getChartColors();
-    const chartColors = ['#0ea5e9','#14b8a6','#f43f5e','#f59e0b','#10b981','#6366f1','#8b5cf6','#ef4444'];
+    const chartColors = ['#0ea5e9', '#14b8a6', '#f43f5e', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ef4444'];
 
     chartInstances.category = new Chart(document.getElementById('categoryChart'), {
         type: 'doughnut',

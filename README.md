@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://fadelalshami719-a11y.github.io/fahras-app/"><strong>🌐 تجربة التطبيق مباشرة (Live Demo)</strong></a> •
-    <a href="https://fadelalshami719-a11y.github.io/fahras-app//privacy.html"><strong>🛡️ سياسة الخصوصية (Privacy Policy)</strong></a>
+    <a href="https://fadelalshami719-a11y.github.io/fahras-app/privacy.html"><strong>🛡️ سياسة الخصوصية (Privacy Policy)</strong></a>
   </p>
 </div>
 
@@ -22,7 +22,7 @@
 ## 🔒 الخصوصية والأمان
 - يعمل التطبيق بالكامل من جانب المتصفح (**Client-Side**) ولا يمتلك أي خوادم خارجية لجمع بيانات المستخدمين.
 - يلتزم التطبيق بـ [سياسة بيانات مستخدمي خدمات Google API](https://developers.google.com/terms/api-services-user-data-policy).
-- للاطلاع على التفاصيل الكاملة، راجع صفحة [سياسة الخصوصية وشروط الاستخدام](https://USERNAME.github.io/fihris/privacy.html).
+- للاطلاع على التفاصيل الكاملة، راجع صفحة [سياسة الخصوصية وشروط الاستخدام](https://fadelalshami719-a11y.github.io/fahras-app/privacy.html).
 
 ---
 

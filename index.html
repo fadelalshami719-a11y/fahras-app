@@ -28,6 +28,18 @@
 </head>
 
 <body data-theme="dark">
+    <script>
+        (function () {
+            var savedTheme = localStorage.getItem('linkvault_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.body.setAttribute('data-theme', savedTheme);
+            if (localStorage.getItem('fahras_hide_intro') === '1') {
+                var st = document.createElement('style');
+                st.textContent = '#crawlerVisibleIntro { display: none !important; }';
+                document.head.appendChild(st);
+            }
+        })();
+    </script>
 
     <!-- طبقة التعتيم الخلفية للقائمة الجانبية في الهواتف -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
@@ -116,12 +128,18 @@
                         </p>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <a href="privacy.html" class="btn btn-secondary"
-                            style="text-decoration:none;font-size:0.8rem;padding:6px 12px;">
-                            سياسة الخصوصية / Privacy Policy
-                        </a>
-                        <button type="button" onclick="this.closest('#crawlerVisibleIntro').style.display='none'"
-                            class="nav-btn" title="إخفاء" style="width:32px;height:32px;">
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <a href="privacy.html" class="btn btn-secondary"
+                                style="text-decoration:none;font-size:0.8rem;padding:6px 12px;justify-content:center;">
+                                سياسة الخصوصية / Privacy Policy
+                            </a>
+                            <button type="button" onclick="dismissIntroBanner(true)" class="btn btn-secondary"
+                                style="font-size:0.78rem;padding:6px 12px;color:var(--text-muted);justify-content:center;">
+                                <i class="fas fa-eye-slash"></i> عدم العرض مرة أخرى
+                            </button>
+                        </div>
+                        <button type="button" onclick="dismissIntroBanner(false)" class="nav-btn" title="إخفاء مؤقت"
+                            style="width:32px;height:32px;">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -256,7 +274,7 @@
                                 <div class="google-profile-info">
                                     <h4 id="googleUserName">اسم المستخدم</h4>
                                     <p id="googleUserEmail">user@gmail.com</p>
-                                    <span class="sync-badge" id="lastSyncLabel"><i class="fas fa-cloud-check"></i> متصل
+                                    <span class="sync-badge" id="lastSyncLabel"><i class="fas fa-check-circle"></i> متصل
                                         بـ Google Drive</span>
                                 </div>
                             </div>
@@ -351,7 +369,8 @@
                                     style="text-decoration:none;padding:7px 14px;font-size:0.84rem;">
                                     <i class="fas fa-shield-alt"></i> سياسة الخصوصية
                                 </a>
-                                <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill">
+                                <a href="https://wa.me/963944650364" target="_blank" rel="noopener noreferrer"
+                                    class="whatsapp-pill">
                                     <i class="fab fa-whatsapp"></i>
                                     <span>+963 944 650 364</span>
                                 </a>
@@ -385,7 +404,8 @@
                     <span class="mobile-rights"><strong>فِهرِس</strong> © 2026 • <a href="privacy.html"
                             style="color:var(--primary-light);text-decoration:none;">الخصوصية</a></span>
                 </div>
-                <a href="https://wa.me/963944650364" target="_blank" class="whatsapp-pill" title="راسلني عبر واتساب">
+                <a href="https://wa.me/963944650364" target="_blank" rel="noopener noreferrer" class="whatsapp-pill"
+                    title="راسلني عبر واتساب">
                     <i class="fab fa-whatsapp"></i>
                     <span class="wa-number">+963 944 650 364</span>
                 </a>

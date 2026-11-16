@@ -284,19 +284,14 @@ function updateGoogleUI() {
 
         if (navBtn) {
             if (needsReconnect) {
+                navBtn.style.display = 'inline-flex';
                 navBtn.classList.remove('connected');
                 navBtn.style.borderColor = 'var(--warning)';
                 navBtn.style.background = 'rgba(245, 158, 11, 0.15)';
                 navBtn.style.color = 'var(--warning)';
                 navBtn.innerHTML = `<i class="fas fa-exclamation-triangle"></i><span>إعادة الاتصال</span>`;
             } else {
-                navBtn.classList.add('connected');
-                navBtn.style.borderColor = '';
-                navBtn.style.background = '';
-                navBtn.style.color = '';
-                navBtn.innerHTML = googleUserProfile.picture
-                    ? `<img src="${escapeHtml(googleUserProfile.picture)}" alt=""><span>متصل</span>`
-                    : `<i class="fab fa-google"></i><span>متصل</span>`;
+                navBtn.style.display = 'none';
             }
         }
         if (sidebarName) sidebarName.textContent = googleUserProfile.name;
@@ -334,6 +329,7 @@ function updateGoogleUI() {
         if (loggedOutBox) loggedOutBox.style.display = 'block';
         if (loggedInBox) loggedInBox.style.display = 'none';
         if (navBtn) {
+            navBtn.style.display = 'inline-flex';
             navBtn.classList.remove('connected');
             navBtn.style.borderColor = '';
             navBtn.style.background = '';
@@ -603,8 +599,10 @@ async function syncWithDrive(silent = true, notifyOnChange = false) {
         if (needUploadToCloud) {
             await uploadBackupToDrive(true);
         }
+        return true;
     } catch (err) {
         console.error('Sync error:', err);
+        return false;
     }
 }
 
@@ -614,13 +612,13 @@ async function manualSyncToDrive() {
         showToast('يرجى تسجيل الدخول لتجديد الجلسة', 'info');
         return;
     }
-    await uploadBackupToDrive(false, true);
+    await syncWithDrive(false, true, true);
 }
 
 async function restoreFromDrive() {
     const valid = await ensureValidGoogleToken(true);
     if (!valid) return;
-    await syncWithDrive(false);
+    await syncWithDrive(false, true, true);
 }
 
 function signOutGoogle() {
@@ -794,11 +792,10 @@ function handleFilterClick(e) {
 
 // ===== الفحص التلقائي السريع للتحديثات من الأجهزة الأخرى =====
 async function checkForRemoteUpdates() {
-    if (!googleUserProfile || isSyncingNow || needsReconnect) return;
+    if (!googleUserProfile || isSyncingNow) return;
     if (syncSettings.frequency !== 'instant') return;
     if (document.visibilityState !== 'visible') return;
 
-    // عدم المقاطعة إذا كان المستخدم يكتب داخل نافذة منبثقة
     const anyModalOpen = document.querySelector('.modal-overlay.active');
     if (anyModalOpen) return;
 
@@ -806,9 +803,11 @@ async function checkForRemoteUpdates() {
     if (!file || !file.modifiedTime) return;
 
     if (file.modifiedTime !== lastKnownCloudModified) {
-        lastKnownCloudModified = file.modifiedTime;
-        localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
-        await syncWithDrive(true, true);
+        const synced = await syncWithDrive(true, true, false);
+        if (synced) {
+            lastKnownCloudModified = file.modifiedTime;
+            localStorage.setItem('fahras_cloud_mtime', lastKnownCloudModified);
+        }
     }
 }
 
@@ -1728,8 +1727,11 @@ function saveData(skipCloudSync = false) {
 
     if (syncSettings.frequency === 'instant') {
         clearTimeout(autoSyncTimeout);
-        autoSyncTimeout = setTimeout(() => {
-            uploadBackupToDrive(true, false);
+        autoSyncTimeout = setTimeout(async () => {
+            const ok = await uploadBackupToDrive(true, false);
+            if (!ok && needsReconnect) {
+                showToast('تم الحفظ محلياً. اضغط على "إعادة الاتصال" في الأعلى لمزامنة التعديل مع السحابة', 'info');
+            }
         }, 400);
     } else if (syncSettings.frequency === 'daily') {
         const dayMs = 24 * 60 * 60 * 1000;

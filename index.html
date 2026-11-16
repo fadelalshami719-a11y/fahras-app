@@ -468,9 +468,27 @@
                     <input type="hidden" id="editingCategoryId" value="">
                     <div class="form-group"><label>اسم التصنيف</label><input type="text" id="categoryName"
                             placeholder="مثال: تعليم" required></div>
-                    <div class="form-group"><label>الأيقونة</label><input type="text" id="categoryIcon"
-                            placeholder="fas fa-graduation-cap" value="fas fa-folder"><small
-                            style="color:var(--text-muted);font-size:0.75rem;">استخدم أيقونات Font Awesome</small></div>
+                    <div class="form-group">
+                        <label>الأيقونة</label>
+                        <div class="icon-picker-wrapper" id="iconPickerWrapper">
+                            <div class="custom-icon-input-wrap">
+                                <button type="button" class="custom-icon-preview" id="iconPickerToggleBtn" title="اختر أيقونة من القائمة">
+                                    <i class="fas fa-folder" id="categoryIconPreviewIcon"></i>
+                                </button>
+                                <input type="text" id="categoryIcon" placeholder="اختر من القائمة أو اكتب كود Font Awesome" value="fas fa-folder">
+                                <button type="button" class="icon-dropdown-arrow" id="iconPickerArrowBtn" title="عرض / إخفاء الأيقونات">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="icon-picker-dropdown" id="iconPickerDropdown">
+                                <div class="icon-search-wrap">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="iconSearchInput" placeholder="ابحث عن أيقونة (محاسبة، برمجة، ألعاب، كتاب...)">
+                                </div>
+                                <div class="icon-options-grid" id="iconPickerGrid"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="form-group"><label>اللون</label>
                         <div class="color-options" id="colorOptions">
                             <div class="color-option selected" style="background:#0ea5e9;" data-color="#0ea5e9"

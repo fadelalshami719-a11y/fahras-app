@@ -169,8 +169,8 @@ function initGoogleAuth() {
             setTokenSession(tokenResponse.access_token, tokenResponse.expires_in);
             await fetchGoogleUserProfile();
             updateGoogleUI();
-            showToast('تم تسجيل الدخول بنجاح! جارٍ مزامنة بياناتك...', 'success');
-            await syncWithDrive(true);
+            showToast('تم تسجيل الدخول بنجاح!', 'success');
+            await syncWithDrive(false);
         }
     });
 
@@ -465,10 +465,13 @@ async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
 }
 
 // المزامنة الذكية: تدمج السحابة مع المحلي مع احترام عمليات الحذف وتحديثات الأجهزة الأخرى
-async function syncWithDrive(silent = true, notifyOnChange = false) {
-    if (!googleUserProfile || isSyncingNow) return;
-    const valid = await ensureValidGoogleToken(false);
-    if (!valid) return;
+async function syncWithDrive(silent = true, notifyOnChange = false, interactiveAuth = false) {
+    if (!googleUserProfile || isSyncingNow) return false;
+    const valid = await ensureValidGoogleToken(interactiveAuth);
+    if (!valid) {
+        if (!silent) showToast('انتهت جلسة Google، يرجى الضغط على "إعادة الاتصال" في الأعلى', 'info');
+        return false;
+    }
 
     const file = await findDriveBackupFile();
     if (!file) {
@@ -1402,7 +1405,8 @@ function editCategory(id) {
 function deleteLink(id) {
     const link = links.find(l => String(l.id) === String(id));
     if (!link) return;
-    showConfirmModal(`هل أنت متأكد من حذف الرابط "${link.name}"؟ سيتم حذفه من السحابة أيضاً.`, () => {
+    const cloudNote = googleUserProfile ? ' سيتم حذفه من السحابة أيضاً.' : '';
+    showConfirmModal(`هل أنت متأكد من حذف الرابط "${link.name}"؟${cloudNote}`, () => {
         links = links.filter(l => String(l.id) !== String(id));
         syncTombstones.deletedLinks[String(id)] = Date.now();
         saveSyncMeta();
@@ -1462,7 +1466,8 @@ function deleteCategory(id) {
 }
 
 function clearAllData() {
-    showConfirmModal('تحذير: سيتم حذف جميع الروابط والتصنيفات نهائياً من هذا الجهاز ومن السحابة. هل أنت متأكد؟', async () => {
+    const scopeText = googleUserProfile ? 'من هذا الجهاز ومن السحابة' : 'من هذا الجهاز';
+    showConfirmModal(`تحذير: سيتم حذف جميع الروابط والتصنيفات نهائياً ${scopeText}. هل أنت متأكد؟`, async () => {
         links = [];
         currentFilter = 'all';
         categories = DEFAULT_CATEGORIES.map(c => ({ ...c, updatedAt: Date.now() }));
@@ -1718,7 +1723,7 @@ function closeConfirmModal() {
     confirmCallback = null;
 }
 
-// دالة الحفظ المركزية السريعة
+// دالة الحفظ المركزية السريعة  
 function saveData(skipCloudSync = false) {
     localStorage.setItem('linkvault_links', JSON.stringify(links));
     localStorage.setItem('linkvault_categories', JSON.stringify(categories));

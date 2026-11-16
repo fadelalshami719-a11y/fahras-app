@@ -717,6 +717,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.getElementById('iconPickerToggleBtn')?.addEventListener('click', () => toggleIconPickerDropdown());
+    document.getElementById('iconPickerArrowBtn')?.addEventListener('click', () => toggleIconPickerDropdown());
+
+    document.getElementById('iconSearchInput')?.addEventListener('input', function () {
+        renderIconPicker(document.getElementById('categoryIcon').value, this.value);
+    });
+
+    document.getElementById('iconPickerGrid')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.icon-option');
+        if (!btn) return;
+        const chosenIcon = btn.dataset.icon;
+        document.getElementById('categoryIcon').value = chosenIcon;
+        updateIconPreview(chosenIcon);
+        toggleIconPickerDropdown(false);
+    });
+
+    document.getElementById('categoryIcon')?.addEventListener('input', function () {
+        const val = this.value.trim();
+        updateIconPreview(val);
+        document.querySelectorAll('#iconPickerGrid .icon-option').forEach(el => {
+            el.classList.toggle('selected', el.dataset.icon === val);
+        });
+    });
+
     startLiveSyncWatcher();
     if (!localStorage.getItem('linkvault_categories')) {
         localStorage.setItem('linkvault_categories', JSON.stringify(categories));
@@ -1119,6 +1143,137 @@ function closeModal() {
     editingId = null;
 }
 
+const PRESET_CATEGORY_ICONS = [
+    { icon: 'fas fa-folder', tags: 'مجلد عام ملفات folder' },
+    { icon: 'fas fa-folder-open', tags: 'مجلد مفتوح ملفات open' },
+    { icon: 'fas fa-globe', tags: 'عام عالم إنترنت ويب مواقع globe web' },
+    { icon: 'fas fa-star', tags: 'نجمة مميز مفضلة star' },
+    { icon: 'fas fa-heart', tags: 'قلب مفضلة حب heart' },
+    { icon: 'fas fa-bookmark', tags: 'إشارة مرجعية حفظ bookmark' },
+    { icon: 'fas fa-tags', tags: 'وسوم تصنيفات tags' },
+    { icon: 'fas fa-thumbtack', tags: 'تثبيت دبوس pin' },
+    { icon: 'fas fa-compass', tags: 'بوصلة استكشاف فهرس compass' },
+    { icon: 'fas fa-archive', tags: 'أرشيف تخزين archive' },
+    { icon: 'fas fa-code', tags: 'برمجة تطوير كود مواقع code dev' },
+    { icon: 'fas fa-laptop-code', tags: 'حاسوب برمجة لابتوب تطوير laptop' },
+    { icon: 'fas fa-terminal', tags: 'طرفية أوامر لينكس كالي terminal linux' },
+    { icon: 'fas fa-bug', tags: 'أخطاء فحص حماية اختراق bug security' },
+    { icon: 'fas fa-robot', tags: 'ذكاء اصطناعي روبوت بوت ai robot' },
+    { icon: 'fas fa-brain', tags: 'ذكاء اصطناعي عقل تفكير تعلم ai brain' },
+    { icon: 'fas fa-microchip', tags: 'معالج تقنية إلكترونيات hardware chip' },
+    { icon: 'fas fa-server', tags: 'خادم سيرفر استضافة server' },
+    { icon: 'fas fa-database', tags: 'قواعد بيانات تخزين database sql' },
+    { icon: 'fas fa-cloud', tags: 'سحابة تخزين جوجل درايف cloud' },
+    { icon: 'fas fa-wifi', tags: 'شبكات إنترنت اتصال wifi network' },
+    { icon: 'fas fa-mobile-alt', tags: 'هاتف جوال تطبيقات موبايل mobile phone' },
+    { icon: 'fas fa-paint-brush', tags: 'تصميم رسم ألوان فرشاة design art' },
+    { icon: 'fas fa-palette', tags: 'لوحة ألوان تصميم جرافيك palette' },
+    { icon: 'fas fa-pen-nib', tags: 'قلم رسم تصميم شعارات vector pen' },
+    { icon: 'fas fa-magic', tags: 'سحر تعديل صور تأثيرات magic' },
+    { icon: 'fas fa-camera', tags: 'كاميرا تصوير صور فوتوغرافيا camera' },
+    { icon: 'fas fa-video', tags: 'فيديو مونتاج تصوير يوتيوب video' },
+    { icon: 'fas fa-images', tags: 'صور معرض خلفيات images gallery' },
+    { icon: 'fas fa-icons', tags: 'أيقونات رموز icons' },
+    { icon: 'fas fa-graduation-cap', tags: 'تعليم دراسة جامعة تخرج دورات education' },
+    { icon: 'fas fa-book', tags: 'كتاب قراءة كتب روايات مكتبة book' },
+    { icon: 'fas fa-book-open', tags: 'قراءة مطالعة كتاب مفتوح read' },
+    { icon: 'fas fa-chalkboard-teacher', tags: 'تدريس أستاذ دورة شرح محاضرة teacher' },
+    { icon: 'fas fa-university', tags: 'جامعة أكاديمية معهد مركز university' },
+    { icon: 'fas fa-atom', tags: 'علوم فيزياء كيمياء ذرة science' },
+    { icon: 'fas fa-flask', tags: 'مختبر تجارب علوم كيمياء lab' },
+    { icon: 'fas fa-language', tags: 'لغات ترجمة إنجليزي عربي language translate' },
+    { icon: 'fas fa-lightbulb', tags: 'أفكار إبداع إلهام نصائح idea' },
+    { icon: 'fas fa-calculator', tags: 'محاسبة آلة حاسبة حسابات رياضيات accounting calculator' },
+    { icon: 'fas fa-file-invoice-dollar', tags: 'فاتورة محاسبة مالية ضرائب invoice' },
+    { icon: 'fas fa-chart-line', tags: 'إحصائيات أرباح نمو تحليل بيانات chart' },
+    { icon: 'fas fa-chart-pie', tags: 'تقارير ميزانية رسوم بيانية pie' },
+    { icon: 'fas fa-wallet', tags: 'محفظة مال نقود مصاريف wallet' },
+    { icon: 'fas fa-coins', tags: 'عملات نقود استثمار مالية coins' },
+    { icon: 'fas fa-briefcase', tags: 'عمل وظيفة أعمال مشاريع شركات business' },
+    { icon: 'fas fa-handshake', tags: 'صفقات شراكة عملاء اتفاق business' },
+    { icon: 'fas fa-building', tags: 'شركة مؤسسة مكتب مبنى company' },
+    { icon: 'fas fa-shopping-cart', tags: 'تسوق متجر شراء سلة shopping' },
+    { icon: 'fas fa-shopping-bag', tags: 'حقيبة تسوق متاجر عروض bag' },
+    { icon: 'fas fa-store', tags: 'متجر محل إلكتروني store' },
+    { icon: 'fas fa-credit-card', tags: 'بطاقة دفع بنوك إلكتروني card' },
+    { icon: 'fas fa-tools', tags: 'أدوات صيانة إعدادات خدمات tools' },
+    { icon: 'fas fa-wrench', tags: 'مفتاح صيانة إصلاح أدوات wrench' },
+    { icon: 'fas fa-cog', tags: 'إعدادات ضبط نظام settings' },
+    { icon: 'fas fa-download', tags: 'تحميل تنزيل برامج ملفات download' },
+    { icon: 'fas fa-newspaper', tags: 'أخبار صحافة مقالات جريدة news' },
+    { icon: 'fas fa-rss', tags: 'تغذية أخبار مدونات rss blog' },
+    { icon: 'fas fa-bullhorn', tags: 'إعلانات تسويق نشر أخبار marketing' },
+    { icon: 'fas fa-comments', tags: 'محادثة تواصل دردشة منتدى chat' },
+    { icon: 'fas fa-envelope', tags: 'بريد إلكتروني رسائل إيميل email' },
+    { icon: 'fas fa-shield-alt', tags: 'حماية أمان خصوصية درع security shield' },
+    { icon: 'fas fa-lock', tags: 'قفل كلمة مرور خصوصية سرية lock' },
+    { icon: 'fas fa-key', tags: 'مفتاح حسابات وصول تفعيل key' },
+    { icon: 'fas fa-gamepad', tags: 'ألعاب بلايستيشن قيمنق ترفيه games ps4' },
+    { icon: 'fas fa-film', tags: 'أفلام سينما مسلسلات أنمي movies anime' },
+    { icon: 'fas fa-tv', tags: 'تلفاز مشاهدة حلقات بث tv' },
+    { icon: 'fas fa-music', tags: 'موسيقى طرب أغاني صوتيات music' },
+    { icon: 'fas fa-headphones', tags: 'سماعات بودكاست استماع صوت headphones' },
+    { icon: 'fas fa-dragon', tags: 'أنمي فانتازيا ألعاب تنين anime fantasy' },
+    { icon: 'fas fa-mask', tags: 'أنمي غموض روايات مسرح mask' },
+    { icon: 'fas fa-home', tags: 'منزل بيت رئيسية سكن home' },
+    { icon: 'fas fa-utensils', tags: 'طعام مطبخ وصفات مطاعم food' },
+    { icon: 'fas fa-mug-hot', tags: 'مشروبات متة قهوة شاي مقهى drink cafe' },
+    { icon: 'fas fa-plane', tags: 'سفر طيران رحلات سياحة travel' },
+    { icon: 'fas fa-map-marker-alt', tags: 'خرائط مواقع أماكن عناوين map' },
+    { icon: 'fas fa-car', tags: 'سيارات مواصلات نقل car' },
+    { icon: 'fas fa-heartbeat', tags: 'صحة طب لياقة عافية health' },
+    { icon: 'fas fa-dumbbell', tags: 'رياضة تمارين جيم لياقة sport' },
+    { icon: 'fas fa-futbol', tags: 'كرة قدم رياضة مباريات football' },
+    { icon: 'fas fa-mosque', tags: 'إسلاميات قرآن دين مسجد islamic' },
+    { icon: 'fas fa-paw', tags: 'حيوانات أليفة قطط رعاية pets cat' },
+    { icon: 'fas fa-gift', tags: 'هدايا عروض مجاني جوائز gift' },
+    { icon: 'fas fa-clock', tags: 'وقت تنظيم مهام مواعيد time' }
+];
+
+function toggleIconPickerDropdown(forceState) {
+    const wrapper = document.getElementById('iconPickerWrapper');
+    if (!wrapper) return;
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !wrapper.classList.contains('open');
+    wrapper.classList.toggle('open', shouldOpen);
+    if (shouldOpen) {
+        renderIconPicker(document.getElementById('categoryIcon').value, document.getElementById('iconSearchInput')?.value || '');
+        document.getElementById('iconSearchInput')?.focus();
+    }
+}
+
+function updateIconPreview(iconClass) {
+    const previewIcon = document.getElementById('categoryIconPreviewIcon');
+    if (!previewIcon) return;
+    previewIcon.className = sanitizeIcon(iconClass);
+}
+
+function renderIconPicker(selectedIcon = 'fas fa-folder', searchTerm = '') {
+    const grid = document.getElementById('iconPickerGrid');
+    if (!grid) return;
+
+    const currentVal = document.getElementById('categoryIcon')?.value.trim() || selectedIcon;
+    const safeSelected = sanitizeIcon(currentVal);
+    const q = searchTerm.toLowerCase().trim();
+
+    const filtered = q
+        ? PRESET_CATEGORY_ICONS.filter(item =>
+            item.tags.toLowerCase().includes(q) || item.icon.toLowerCase().includes(q)
+        )
+        : PRESET_CATEGORY_ICONS;
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div class="icon-no-results">لا توجد أيقونة مطابقة لـ "${escapeHtml(searchTerm)}"</div>`;
+    } else {
+        grid.innerHTML = filtered.map(item => `
+            <button type="button" class="icon-option ${item.icon === safeSelected ? 'selected' : ''}" 
+                    data-icon="${item.icon}" title="${item.tags.split(' ').slice(0, 3).join(' • ')}">
+                <i class="${item.icon}"></i>
+            </button>
+        `).join('');
+    }
+    updateIconPreview(safeSelected);
+}
+
 function openCategoryModal() {
     editingCategoryId = null;
     document.getElementById('categoryModalTitle').innerHTML = '<i class="fas fa-folder-plus"></i> تصنيف جديد';
@@ -1126,6 +1281,10 @@ function openCategoryModal() {
     document.getElementById('editingCategoryId').value = '';
     document.getElementById('categoryName').value = '';
     document.getElementById('categoryIcon').value = 'fas fa-folder';
+    const iconSearch = document.getElementById('iconSearchInput');
+    if (iconSearch) iconSearch.value = '';
+    toggleIconPickerDropdown(false);
+    renderIconPicker('fas fa-folder');
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
     document.querySelector('.color-option').classList.add('selected');
     document.getElementById('categoryModal').classList.add('active');
@@ -1134,6 +1293,7 @@ function openCategoryModal() {
 
 function closeCategoryModal() {
     document.getElementById('categoryModal').classList.remove('active');
+    toggleIconPickerDropdown(false);
     editingCategoryId = null;
 }
 
@@ -1231,6 +1391,10 @@ function editCategory(id) {
     document.getElementById('editingCategoryId').value = id;
     document.getElementById('categoryName').value = cat.name;
     document.getElementById('categoryIcon').value = safeIcon;
+    const iconSearch = document.getElementById('iconSearchInput');
+    if (iconSearch) iconSearch.value = '';
+    toggleIconPickerDropdown(false);
+    renderIconPicker(safeIcon);
     document.querySelectorAll('.color-option').forEach(c => c.classList.toggle('selected', c.dataset.color === safeColor));
     document.getElementById('categoryModal').classList.add('active');
     document.getElementById('categoryName').focus();

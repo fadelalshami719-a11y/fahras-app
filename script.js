@@ -174,11 +174,11 @@ function initGoogleAuth() {
         }
     });
 
-    // عند فتح تبويب جديد والمستخدم ظاهر كـ"متصل"، نبدأ أول مزامنة لتجديد التوكن بصمت
-    if (googleUserProfile && isSessionExpired()) {
+    // عند فتح الصفحة والمستخدم مسجل دخوله، نزامن فوراً
+    if (googleUserProfile) {
         const dayMs = 24 * 60 * 60 * 1000;
         if (syncSettings.frequency === 'instant' || (syncSettings.frequency === 'daily' && (Date.now() - syncSettings.lastDailySync) >= dayMs)) {
-            syncWithDrive(true);
+            syncWithDrive(true, true, false);
         }
     }
 }
@@ -283,16 +283,7 @@ function updateGoogleUI() {
         if (emailEl) emailEl.textContent = googleUserProfile.email;
 
         if (navBtn) {
-            if (needsReconnect) {
-                navBtn.style.display = 'inline-flex';
-                navBtn.classList.remove('connected');
-                navBtn.style.borderColor = 'var(--warning)';
-                navBtn.style.background = 'rgba(245, 158, 11, 0.15)';
-                navBtn.style.color = 'var(--warning)';
-                navBtn.innerHTML = `<i class="fas fa-exclamation-triangle"></i><span>إعادة الاتصال</span>`;
-            } else {
-                navBtn.style.display = 'none';
-            }
+            navBtn.style.setProperty('display', 'none', 'important');
         }
         if (sidebarName) sidebarName.textContent = googleUserProfile.name;
 
@@ -371,7 +362,7 @@ async function findDriveBackupFile() {
     return (data.files && data.files.length > 0) ? data.files[0] : null;
 }
 
-async function uploadBackupToDrive(silent = false, interactiveAuth = false) {
+async function uploadBackupToDrive(silent = false, interactiveAuth = true) {
     if (!googleUserProfile || isSyncingNow) return false;
     const valid = await ensureValidGoogleToken(interactiveAuth);
     if (!valid) {

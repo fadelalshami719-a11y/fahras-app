@@ -475,15 +475,14 @@ async function syncWithDrive(silent = true, notifyOnChange = false, interactiveA
 
     const file = await findDriveBackupFile();
     if (!file) {
-        await uploadBackupToDrive(true);
-        return;
+        return await uploadBackupToDrive(true, interactiveAuth);
     }
 
     try {
         const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
             headers: { Authorization: `Bearer ${googleAccessToken}` }
         });
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const cloudData = await res.json();
 
         const cloudTomb = cloudData.tombstones || { deletedLinks: {}, deletedCategories: {}, clearedAt: 0 };
@@ -1865,6 +1864,7 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        toggleIconPickerDropdown(false);
         document.getElementById('sidebar')?.classList.remove('active');
         document.getElementById('sidebarOverlay')?.classList.remove('active');
         confirmCallback = null;
